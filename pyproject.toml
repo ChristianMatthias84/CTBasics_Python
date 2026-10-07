@@ -13,6 +13,7 @@ dependencies = [
   "scipy>=1.14",
   "matplotlib>=3.9",
   "pydicom>=3.0",
+  "psutil>=6.0",
 ]
 
 [project.optional-dependencies]
@@ -21,8 +22,13 @@ dev = [
   "pytest-cov>=5.0",
 ]
 
-[tool.setuptools]
-package-dir = {"" = "src"}
-
 [tool.setuptools.packages.find]
-where = ["src"]
+where = ["."]
+include = ["CTBasics*"]
+
+[tool.setuptools.package-data]
+"CTBasics.Simulation" = ["spectra/*.txt", "attenuationcoeffs/*.txt"]
+"CTBasics.RawData" = ["Tables/*/*.IRSTBL", "Tables/*/*.xml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ScannerGeometry>
+	<Scanner Model="P82B" Asic="ADI" ProductName="aCTivate HP4"/>
+
+	<!-- This section holds the generic tube parameters that are common for both tube (e. g. in a DualSource system).         -->
+	<!-- Further specific settings for inidividual tubes must be set in the <beam> section in the <MeasurementSystem> section -->
+	<Beam>
+		<Anode formula="W"/>
+
+		<Flat formula="TITAN" material="Ti" thickness="0.87"/>
+		<Flat formula="ALU" material="Al" thickness="1.7"/>
+		<Flat formula="TUNGSTEN" material="W" thickness="0.008"/>
+		<Flat name="Sn" IsMovable="true" material="Sn" formula="TIN" thickness="0.6"/>
+		<SplitFilter name="AuSn" IsMovable="true" material="AuSn" formula="GOLD" thickness="0.05"/>
+
+		<Bowtie name="w1" shape="BowtieWide" material="Al"
+				formula="ALU" r1="26.700000" r2="49.700000" r3="5.000000" dim="0.500000" dmaxg="31.500000" dmaxc="28.000000" xmax="80.000000" rd="449.000000" xr2="61.447539"/>
+
+		<Bowtie name="w2" shape="BowtieNarrow" material="Al" IsMovable="True"
+				formula="ALU" r1="26.700000" r2="49.700000" r3="5.000000" dim="0.500000" dmaxg="31.500000" dmaxc="28.000000" xmax="80.000000" rd="449.000000" xr2="61.447539"/>
+
+		<Combined name="Standard"       combination="w1"/>
+		<Combined name="Tin"            combination="w1+w2"    DicomFilterTypeEntry="WEDGE_2"/>/>
+		<Combined name="Tin"            combination="w1+Sn"    DicomFilterTypeEntry="SN"/>
+		<Combined name="Tin"            combination="w1+w2+Sn" DicomFilterTypeEntry="WEDGE_2 SN"/>/>
+		<Combined name="TwinBeam"       combination="w1+AuSn"  DicomFilterTypeEntry="AUSN_DESF"/>
+	</Beam>
+
+	<MeasurementSystem Id="A">
+		<AngleMeasurementType>FixedAngle</AngleMeasurementType>
+		<RayGeometry>ConeBeam</RayGeometry>
+		<DetectorFanType>PartialFan</DetectorFanType>
+		<RadiusFocusDetector>976</RadiusFocusDetector>
+		<RadiusFocusPath>535</RadiusFocusPath>
+		<FocusCollimator>170</FocusCollimator>
+
+		<SystemAngle>0</SystemAngle>
+
+		<AnodeAngle>7</AnodeAngle>
+		<FocusWidth>1.2</FocusWidth>
+		<FocusLength>0.95</FocusLength>
+		<SubFocusWidth>1</SubFocusWidth>
+		<SubFocusLength>1</SubFocusLength>
+
+		<GridGeometry>
+			<Detector N="42 1" Delta="0.02106664569824289 1" Shape="Curved NA">
+				<Module N="1 2" Delta="1 -0.03606290947808913" Shape="NA Curved">
+					<SensorBoard N="20 32" Delta="-1.01729 -1.0942"/>
+				</Module>
+			</Detector>
+		</GridGeometry>
+
+		<DetLayout ReadoutMode="None">
+			<NumberOfChannels>840</NumberOfChannels>
+			<NumberOfRows>64</NumberOfRows>
+			<PhysicalFieldOfView>500</PhysicalFieldOfView>
+			<FanBeamGrid>0.001053332284912</FanBeamGrid>
+			<ActiveBeta>0.82</ActiveBeta>
+			<ActiveZ>0.88</ActiveZ>
+			<SubDetBeta>3</SubDetBeta>
+			<SubDetZ>2</SubDetZ>
+
+			<CrossTalkBeta>0.03</CrossTalkBeta>
+			<CrossTalkZ>0.09</CrossTalkZ>
+
+			<CenterChannelOffset>
+				<Offset FFS="rpp1x1">42.826</Offset>
+			</CenterChannelOffset>
+		
+		</DetLayout>
+	</MeasurementSystem>
+
+	<SliceWidth>
+		<Slice det="600" CombType="None" rpp="rpp1x1" algo="wfbp" option="0" reformat="true"  UI="600"/>
+		<Slice det="600" CombType="None" rpp="rpp1x1" algo="wfbp" option="0" reformat="false"  UI="800"/>
+		<Slice det="600" CombType="None" rpp="rpp1x1" algo="wfbp" option="0" reformat="true"  UI="1000|1500|2000|3000|4000|5000|6000|7000|8000|10000"/>
+
+		<Fuse det="600" UI="3000|4000|5000|6000|7000|8000|10000" CombType="None" organ="body" mode="Fuse2"/>
+
+	</SliceWidth>
+
+	<Voltages>
+		<Voltage kv="70" filter="">
+			<Noise mu="0.2258" neq="0.0252" enoise="0.2645" Imax ="1300" mAsToNeq="4.8325e+05" mAsToLSB="6.7688e+05"/>
+			<Contrast Values="1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00"/>
+			<Dose CTDI16="0.0" CTDI32="0.0"/>
+		</Voltage>
+		<Voltage kv="80" filter="">
+			<Noise mu="0.2258" neq="0.0252" enoise="0.2645" Imax ="1300" mAsToNeq="4.8325e+05" mAsToLSB="6.7688e+05"/>
+			<Contrast Values="1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00"/>
+			<Dose CTDI16="0.0" CTDI32="0.0"/>
+		</Voltage>
+		<Voltage kv="90" filter="">
+			<Noise mu="0.2258" neq="0.0252" enoise="0.2645" Imax ="1300" mAsToNeq="4.8325e+05" mAsToLSB="6.7688e+05"/>
+			<Contrast Values="1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00"/>
+			<Dose CTDI16="0.0" CTDI32="0.0"/>
+		</Voltage>
+		<Voltage kv="100" filter="">
+			<Noise mu="0.2125" neq="0.0417" enoise="0.1343" Imax ="1200" mAsToNeq="7.9966e+05" mAsToLSB="1.1201e+06"/>
+			<Contrast Values="1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00"/>
+			<Dose CTDI16="0.0" CTDI32="0.0"/>
+		</Voltage>
+		<Voltage kv="110" filter="">
+			<Noise mu="0.2043" neq="0.0584" enoise="0.1087" Imax ="1000" mAsToNeq="1.1199e+06" mAsToLSB="1.5686e+06"/>
+			<Contrast Values="1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00"/>
+			<Dose CTDI16="0.0" CTDI32="0.0"/>
+		</Voltage>
+		<Voltage kv="120" filter="">
+			<Noise mu="0.2043" neq="0.0584" enoise="0.1087" Imax ="1000" mAsToNeq="1.1199e+06" mAsToLSB="1.5686e+06"/>
+			<Contrast Values="1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00"/>
+			<Dose CTDI16="0.0" CTDI32="0.0"/>
+		</Voltage>
+		<Voltage kv="130" filter="">
+			<Noise mu="0.1981" neq="0.0708" enoise="0.0607" Imax ="857" mAsToNeq="1.3577e+06" mAsToLSB="1.9017e+06"/>
+			<Contrast Values="1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00"/>
+			<Dose CTDI16="0.0" CTDI32="0.0"/>
+		</Voltage>
+		<Voltage kv="140" filter="">
+			<Noise mu="0.1981" neq="0.0708" enoise="0.0607" Imax ="857" mAsToNeq="1.3577e+06" mAsToLSB="1.9017e+06"/>
+			<Contrast Values="1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00"/>
+			<Dose CTDI16="0.0" CTDI32="0.0"/>
+		</Voltage>
+		<Voltage kv="100" filter="Sn">
+			<Noise mu="0.1955" neq="0.0036" enoise="0.1009" Imax ="1200"  mAsToNeq="6.9035e+04" mAsToLSB="9.6696e+04"/>
+			<Contrast Values="1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00"/>
+			<Dose CTDI16="0.0" CTDI32="0.0"/>
+		</Voltage>
+		<Voltage kv="110" filter="Sn">
+			<Noise mu="0.1955" neq="0.0036" enoise="0.1009" Imax ="1200"  mAsToNeq="6.9035e+04" mAsToLSB="9.6696e+04"/>
+			<Contrast Values="1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00"/>
+			<Dose CTDI16="0.0" CTDI32="0.0"/>
+		</Voltage>
+		<Voltage kv="120" filter="Sn">
+			<Noise mu="0.1955" neq="0.0036" enoise="0.1009" Imax ="1200"  mAsToNeq="6.9035e+04" mAsToLSB="9.6696e+04"/>
+			<Contrast Values="1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00"/>
+			<Dose CTDI16="0.0" CTDI32="0.0"/>
+		</Voltage>
+		<Voltage kv="130" filter="Sn">
+			<Noise mu="0.1955" neq="0.0036" enoise="0.1009" Imax ="1200"  mAsToNeq="6.9035e+04" mAsToLSB="9.6696e+04"/>
+			<Contrast Values="1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00"/>
+			<Dose CTDI16="0.0" CTDI32="0.0"/>
+		</Voltage>
+		<Voltage kv="140" filter="Sn">
+			<Noise mu="0.1801" neq="0.0154" enoise="0.0288" Imax ="800"  mAsToNeq="2.9532e+05" mAsToLSB="4.1365e+05"/>
+			<Contrast Values="1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00"/>
+			<Dose CTDI16="0.0" CTDI32="0.0"/>
+		</Voltage>
+		<Voltage kv="120" filter="AuSn">
+			<!-- Values not validated -->
+			<Noise mu="0.1955" neq="0.0036" enoise="0.1009" Imax ="1200"  mAsToNeq="6.9035e+04" mAsToLSB="9.6696e+04"/>
+			<Contrast Values="1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00"/>
+			<Dose CTDI16="0.0" CTDI32="0.0"/>
+		</Voltage>
+		<Voltage kv="140" filter="AuSn">
+			<!-- Values not validated -->
+			<Noise mu="0.1801" neq="0.0154" enoise="0.0288" Imax ="800"  mAsToNeq="2.9532e+05" mAsToLSB="4.1365e+05"/>
+			<Contrast Values="1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00"/>
+			<Dose CTDI16="0.0" CTDI32="0.0"/>
+		</Voltage>
+	</Voltages>
+
+	<Aquisition>
+		<DmsMode RotationTime="330">
+			<FocalSpotMode FFS="rpp1x1" NumberOfFramePerRotation="1152">
+				<Collimation TubeCombination="A " Value="64x0.6"/>
+			</FocalSpotMode>
+		</DmsMode>
+		<DmsMode RotationTime="500">
+			<FocalSpotMode FFS="rpp1x1" NumberOfFramePerRotation="1536">
+				<Collimation TubeCombination="A " Value="64x0.6"/>
+			</FocalSpotMode>
+		</DmsMode>
+		<DmsMode RotationTime="1000">
+			<FocalSpotMode FFS="rpp1x1" NumberOfFramePerRotation="1536">
+				<Collimation TubeCombination="A " Value="64x0.6"/>
+			</FocalSpotMode>
+		</DmsMode>
+
+		<DmsNoise IntegrationTime="223" ENoiseLSB="2.6"/>
+		<DmsNoise IntegrationTime="226" ENoiseLSB="2.5"/>
+		<DmsNoise IntegrationTime="238" ENoiseLSB="2.4"/>
+		<DmsNoise IntegrationTime="357" ENoiseLSB="2.3"/>
+
+		<ZigZagModes>
+			<Mode Pitch="0.5" CycleTime="1.50" Overlap="0.5"/>
+			<Mode Pitch="1.0" CycleTime="1.5" Overlap="0.5"/>
+			<Mode Pitch="1.0" CycleTime="1.75" Overlap="0.5"/>
+			<Mode Pitch="1.0" CycleTime="2.0" Overlap="0.5"/>
+			<Mode Pitch="1.0" CycleTime="2.25" Overlap="0.5"/>
+			<Mode Pitch="1.0" CycleTime="2.5" Overlap="0.5"/>
+		</ZigZagModes>
+	</Aquisition>
+
+	<FFS>
+		<rpp1x1>
+			<f>
+				<FocusDeflectionPositions>
+					<pos phi="0" z="0"></pos>
+				</FocusDeflectionPositions>
+				<ChannelAlignment>        0.0         </ChannelAlignment>
+				<RadialInterpolationMode> SinCot4     </RadialInterpolationMode>
+				<ChannelResamplingMode>   Double      </ChannelResamplingMode>
+			</f>
+		</rpp1x1>
+	</FFS>
+
+</ScannerGeometry>

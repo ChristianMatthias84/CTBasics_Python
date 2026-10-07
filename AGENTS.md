@@ -8,7 +8,8 @@
 
 ## Project and layout
 
-- `src/ctbasics/` mirrors the MATLAB domains: descriptors, simulation, reconstruction, preprocessing, io, rawdata, parallel, memory, image_manipulation, visualization, and apps.
+- `CTBasics/` mirrors the MATLAB tree one-to-one: `Descriptors/`, `Simulation/`, `Reconstruction/`, `Preprocessing/`, `ReadAndWrite/`, `RawData/`, `MultiCore/`, `Memory/`, `ImageManipulation/`, `Visualization/`, `Apps/`, `Scripts/`, `Benchmarks/`, `LecturesAndTestScripts/`, and `Projects/`.
+- One MATLAB `classdef` file maps to one Python module of the same name holding one class of the same name; MATLAB method names are kept verbatim (PascalCase/camelCase).
 - `docs/migration/` holds the manifest, inventory, dependency notes, contract, validation plan, progress, and deviations.
 - `validation/matlab_reference/` is reserved for isolated MATLAB reference material and generated comparison artifacts.
 - `tests/unit/`, `tests/parity/`, and `tests/integration/` separate algorithmic checks from MATLAB parity and end-to-end coverage.

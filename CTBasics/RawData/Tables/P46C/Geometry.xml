@@ -1,0 +1,330 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ScannerGeometry>
+	<Scanner Model="P46C" Asic="CT32" ProductName="SOMATOM Definition AS"/>
+
+	<!-- This section holds the generic tube parameters that are common for both tube (e. g. in a DualSource system).         -->
+	<!-- Further specific settings for inidividual tubes must be set in the <beam> section in the <MeasurementSystem> section -->
+	<Beam>
+		<Anode formula="W"/>
+
+		<Flat formula="TITAN"    thickness="0.87"/>
+		<Flat formula="ALU"      thickness="1.0"/>
+		<Flat formula="TUNGSTEN" thickness="0.008"/>
+
+		<Bowtie name="w1" shape="BowtieWide" material="Al"
+				formula="ALU" r1="29.000000" r2="51.400000" dim="0.500000" dmaxg="31.000000" dmaxc="31.000000" xmax="110.000000" rd="442.000000" xr2="63.040860"/>
+		<Bowtie name="w2" shape="BowtieNarrow" material="Al" IsMovable="true"
+				formula="ALU" r1="29.000000" r2="51.400000" r3="6.000000" dim="0.500000" dmaxg="31.000000" dmaxc="20.000000" xmax="110.000000" rd="485.000000" xr2="63.040860"/>
+
+		<Combined name="Standard"    combination="w1"    DicomFilterTypeEntry=""/>
+		<Combined name="Cardio"      combination="w1+w2" DicomFilterTypeEntry="WEDGE_2"/>
+	</Beam>
+
+	<MeasurementSystem Id="A">
+		<AngleMeasurementType>FixedAngle</AngleMeasurementType>
+		<RayGeometry>ConeBeam</RayGeometry>
+		<RadiusFocusDetector>1085.6</RadiusFocusDetector>
+		<RadiusFocusPath>595</RadiusFocusPath>
+		<FocusCollimator>187</FocusCollimator>
+
+		<SystemAngle>0</SystemAngle>
+
+		<AnodeAngle>7</AnodeAngle>
+		<FocusWidth>1.5</FocusWidth>
+		<FocusLength>1.5</FocusLength>
+		<SubFocusWidth>1</SubFocusWidth>
+		<SubFocusLength>1</SubFocusLength>
+
+		<DetLayout ReadoutMode="None">
+			<NumberOfChannels>736</NumberOfChannels>
+			<NumberOfRows>32</NumberOfRows>
+			<PhysicalFieldOfView>500</PhysicalFieldOfView>
+			<FanBeamGrid>0.001184450316810</FanBeamGrid>
+			<ActiveBeta>0.77</ActiveBeta>
+			<ActiveZ>0.8</ActiveZ>
+			<SubDetBeta>3</SubDetBeta>
+			<SubDetZ>2</SubDetZ>
+
+			<CrossTalkBeta>0.03</CrossTalkBeta>
+			<CrossTalkZ>0.09</CrossTalkZ>
+
+			<CenterChannelOffset>
+				<Offset FFS="rpp1x1">-1.25</Offset>
+				<Offset FFS="rpp2x1">-1.125</Offset>
+				<Offset FFS="rpp1x2">-1.25</Offset>
+				<Offset FFS="rpp2x2">-1.125</Offset>
+			</CenterChannelOffset>
+		</DetLayout>
+	</MeasurementSystem>
+
+	<SliceWidth>
+		<Slice det="600" CombType="None|Phi" rpp="rpp1x2|rpp2x2|rpp1p1" algo="i5tk" option="2" reformat="false"  UI="500"/>
+		<Slice det="600" CombType="PhiZ" rpp="rpp1x2|rpp2x2|rpp1p1" algo="wfbp" option="0" reformat="false"  UI="400"/>
+		<Slice det="600" CombType="PhiZ" rpp="rpp1x2|rpp2x2|rpp1p1" algo="wfbp" option="0" reformat="true"  UI="500|600|750"/>
+		<Slice det="600" CombType="None|Phi" rpp="rpp1x1|rpp2x1" algo="wfbp" option="0" reformat="false"  UI="750"/>
+		<Slice det="600" CombType="None|Phi" rpp="rpp1x2|rpp2x2|rpp1p1" algo="wfbp" option="0" reformat="false"  UI="600"/>
+		<Slice det="600" CombType="None|Phi" rpp="rpp1x2|rpp2x2|rpp1p1" algo="wfbp" option="0" reformat="true"  UI="750"/>
+		<Slice det="1200" CombType="None|Phi" rpp="rpp1x1|rpp2x1" algo="wfbp" option="0" reformat="false"  UI="1500"/>
+		<Slice det="1200" CombType="None|Phi" rpp="rpp1x2|rpp2x2|rpp1p1" algo="wfbp" option="0" reformat="false"  UI="1200"/>
+		<Slice det="600" CombType="None|Phi" rpp="rpp1x1|rpp2x1|rpp1x2|rpp2x2|rpp1p1" algo="wfbp" option="0" reformat="true"  UI="1000|1500|2000|3000|4000|5000|6000|7000|8000|10000"/>
+		<Slice det="600" CombType="PhiZ" rpp="rpp1x1|rpp2x1|rpp1x2|rpp2x2|rpp1p1" algo="wfbp" option="0" reformat="true"  UI="1000|1500|2000|3000|4000|5000|6000"/>
+		<Slice det="1200" CombType="None|Phi" rpp="rpp1x1|rpp2x1|rpp1x2|rpp2x2|rpp1p1" algo="wfbp" option="0" reformat="true"  UI="2000|3000|4000|5000|6000|7000|8000|10000"/>
+
+		<Fuse det="600" UI="2000|3000" CombType="None|Phi" organ="body" mode="Fuse2"/>
+		<Fuse det="600" UI="4000|5000|6000|7000|8000|10000" CombType="None|Phi" organ="body" mode="Fuse4"/>
+		<Fuse det="600" UI="3000|4000|5000|6000" CombType="None|Phi" organ="neuro|cardiac" mode="Fuse2"/>
+		<Fuse det="600" UI="7000|8000|10000" CombType="None|Phi" organ="neuro|cardiac" mode="Fuse4"/>
+		<Fuse det="1200" UI="5000|6000|7000|8000|10000" CombType="None|Phi" organ="body|neuro|cardiac" mode="Fuse2"/>
+	</SliceWidth>
+
+	<Voltages>
+		<Voltage kv="70" filter="">
+			<Noise mu="0.235" neq="0.0130" enoise="0.1" Imax ="650" mAsToNeq="0.25e+06" mAsToLSB="0.88e+06"/>
+			<Contrast Values="1.00 1.02 1.06 1.12 1.19 1.29 1.39 1.52 1.65 1.80 1.96 2.14"/>
+			<Dose CTDI16="3.15" CTDI32="1.30"/>
+		</Voltage>
+		<Voltage kv="80" filter="">
+			<Noise mu="0.226" neq="0.0216" enoise="0.05" Imax ="650" mAsToNeq="0.35e+06" mAsToLSB="1.23e+06"/>
+			<Contrast Values="1.00 1.02 1.06 1.11 1.17 1.24 1.31 1.40 1.48 1.58 1.68 1.78"/>
+			<Dose CTDI16="4.91" CTDI32="2.09"/>
+		</Voltage>
+		<Voltage kv="100" filter="">
+			<Noise mu="0.213" neq="0.0400" enoise="0.01" Imax ="650" mAsToNeq="0.61e+06" mAsToLSB="1.119e+06"/>
+			<Contrast Values="1.00 1.02 1.06 1.08 1.11 1.14 1.17 1.19 1.22 1.25 1.28 1.30"/>
+			<Dose CTDI16="9.83" CTDI32="4.44"/>
+		</Voltage>
+		<Voltage kv="120" filter="">
+			<Noise mu="0.204" neq="0.0554" enoise="0.005" Imax ="800" mAsToNeq="0.91e+06" mAsToLSB="1.79e+06"/>
+			<Contrast Values="1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00 1.00"/>
+			<Dose CTDI16="16.22" CTDI32="7.60"/>
+		</Voltage>
+		<Voltage kv="140" filter="">
+			<Noise mu="0.198" neq="0.0708" enoise="0.005" Imax ="714" mAsToNeq="1.31e+06" mAsToLSB="2.45e+06"/>
+			<Contrast Values="1.00 0.98 0.96 0.95 0.93 0.91 0.89 0.87 0.85 0.84 0.82 0.80"/>
+			<Dose CTDI16="24.12" CTDI32="11.60"/>
+		</Voltage>
+	</Voltages>
+
+	<Aquisition>
+		<DmsMode RotationTime="300">
+			<FocalSpotMode FFS="rpp1x2" NumberOfFramePerRotation="1152">
+				<Collimation TubeCombination="A" Value="32x0.6"/>
+			</FocalSpotMode>
+			<FocalSpotMode FFS="rpp1x1" NumberOfFramePerRotation="1152">
+				<Collimation TubeCombination="A"  Value="16x1.2"/>
+				<Collimation TubeCombination="A"  Value="32x0.6"/>
+			</FocalSpotMode>
+		</DmsMode>
+		<DmsMode RotationTime="330">
+			<FocalSpotMode FFS="rpp1x2" NumberOfFramePerRotation="1152">
+				<Collimation TubeCombination="A" Value="32x0.6"/>
+			</FocalSpotMode>
+			<FocalSpotMode FFS="rpp1x1" NumberOfFramePerRotation="1152">
+				<Collimation TubeCombination="A"  Value="16x1.2"/>
+				<Collimation TubeCombination="A"  Value="32x0.6"/>
+			</FocalSpotMode>
+		</DmsMode>
+		<DmsMode RotationTime="500">
+			<FocalSpotMode FFS="rpp1x2" NumberOfFramePerRotation="2304">
+				<Collimation TubeCombination="A" Value="32x0.6"/>
+				<Collimation TubeCombination="A" Value="20x0.6"/>
+				<Collimation TubeCombination="A" Value="10x0.6"/>
+			</FocalSpotMode>
+			<FocalSpotMode FFS="rpp1x1" NumberOfFramePerRotation="1152">
+				<Collimation TubeCombination="A"  Value="16x1.2"/>
+				<Collimation TubeCombination="A"  Value="32x0.6"/>
+			</FocalSpotMode>
+		</DmsMode>
+		<DmsMode RotationTime="1000">
+			<FocalSpotMode FFS="rpp2x2" NumberOfFramePerRotation="4608">
+				<Collimation TubeCombination="A" Value="32x0.6"/>
+				<Collimation TubeCombination="A" Value="10x0.6"/>
+				<Collimation TubeCombination="A" Value="20x0.6"/>
+				<Collimation TubeCombination="A" Value="8x0.6"/>
+				<Collimation TubeCombination="A" Value="8x0.3"/>
+			</FocalSpotMode>
+			<FocalSpotMode FFS="rpp2x1" NumberOfFramePerRotation="2304">
+				<Collimation TubeCombination="A"  Value="16x1.2"/>
+				<Collimation TubeCombination="A"  Value="32x0.6"/>
+			</FocalSpotMode>
+		</DmsMode>
+
+		<IntegrationTimes>
+			<DmsNoise IntegrationTime="260" ENoiseLSB="5.5"/>
+			<DmsNoise IntegrationTime="287" ENoiseLSB="5.5"/>
+			<DmsNoise IntegrationTime="217" ENoiseLSB="5.5"/>
+			<DmsNoise IntegrationTime="434" ENoiseLSB="5.5"/>
+		</IntegrationTimes>
+
+		<ZigZagModes>
+			<Mode Pitch="0.5" CycleTime="1.25" Overlap="0.5"/>
+			<Mode Pitch="0.5" CycleTime="1.50" Overlap="0.5"/>
+			<Mode Pitch="0.75" CycleTime="1.0" Overlap="0.25"/>
+			<Mode Pitch="1.0" CycleTime="1.5" Overlap="0.5"/>
+			<Mode Pitch="1.0" CycleTime="1.75" Overlap="0.5"/>
+			<Mode Pitch="1.0" CycleTime="2.0" Overlap="0.5"/>
+			<Mode Pitch="1.0" CycleTime="2.25" Overlap="0.5"/>
+			<Mode Pitch="1.0" CycleTime="2.5" Overlap="0.5"/>
+			<Mode Pitch="1.5" CycleTime="2.5" Overlap="-0.5"/>
+			<Mode Pitch="1.5" CycleTime="3.0" Overlap="-0.5"/>
+		</ZigZagModes>
+
+	</Aquisition>
+
+	<CaScoring>
+		<CaScore kv="80"  FactorS="0.545"  FactorM="0.571"  FactorL="0.596"/>
+		<CaScore kv="100" FactorS="0.679"  FactorM="0.714"  FactorL="0.746"/>
+		<CaScore kv="120" FactorS="0.790"  FactorM="0.833"  FactorL="0.872"/>
+		<CaScore kv="140" FactorS="0.881"  FactorM="0.931"  FactorL="0.975"/>
+	</CaScoring>
+
+	<FFS>
+		<rpp1x1>
+			<f>
+				<FocusDeflectionPositions>
+					<pos phi="0" z="0"></pos>
+				</FocusDeflectionPositions>
+				<ChannelAlignment>        0.0         </ChannelAlignment>
+				<RadialInterpolationMode> Nuttal      </RadialInterpolationMode>
+				<ChannelResamplingMode>   Double      </ChannelResamplingMode>
+				<CrossTalkAmplitude>      0.210       </CrossTalkAmplitude>
+				<FocusWidth>              0.80        </FocusWidth>
+				<EFSAmplitude>            0.1         </EFSAmplitude>
+				<EFSRange>                2.2286      </EFSRange>
+				<FFSSmoothing>            0.0         </FFSSmoothing>
+				<FingerPrintFilter>       Virtual     </FingerPrintFilter>
+			</f>
+		</rpp1x1>
+
+		<rpp2x1>
+			<s>
+				<FocusDeflectionPositions>
+					<pos phi="0.5" z="0"></pos>
+					<pos phi="-0.5" z="0"></pos>
+				</FocusDeflectionPositions>
+				<ChannelAlignment>        0.0         </ChannelAlignment>
+				<RadialInterpolationMode> Linear      </RadialInterpolationMode>
+				<ChannelResamplingMode>   NoChange    </ChannelResamplingMode>
+				<CrossTalkAmplitude>      0.210       </CrossTalkAmplitude>
+				<FocusWidth>              0.80        </FocusWidth>
+				<EFSAmplitude>            0.1         </EFSAmplitude>
+				<EFSRange>                2.2286      </EFSRange>
+				<FFSSmoothing>            0.326       </FFSSmoothing>
+				<FingerPrintFilter>       Virtual     </FingerPrintFilter>
+			</s>
+			<h>
+				<FocusDeflectionPositions>
+					<pos phi="0.5" z="0"></pos>
+					<pos phi="-0.5" z="0"></pos>
+				</FocusDeflectionPositions>
+				<ChannelAlignment>        0.0         </ChannelAlignment>
+				<RadialInterpolationMode> Nuttal      </RadialInterpolationMode>
+				<ChannelResamplingMode>   Upsample2   </ChannelResamplingMode>
+				<CrossTalkAmplitude>      0.205       </CrossTalkAmplitude>
+				<FocusWidth>              0.62        </FocusWidth>
+				<EFSAmplitude>            0.1         </EFSAmplitude>
+				<EFSRange>                2.2286      </EFSRange>
+				<FFSSmoothing>            0.250       </FFSSmoothing>
+			</h>
+			<u>
+				<FocusDeflectionPositions>
+					<pos phi="0.5" z="0"></pos>
+					<pos phi="-0.5" z="0"></pos>
+				</FocusDeflectionPositions>
+				<ChannelAlignment>        0.0         </ChannelAlignment>
+				<RadialInterpolationMode> Nuttal      </RadialInterpolationMode>
+				<ChannelResamplingMode>   Upsample2   </ChannelResamplingMode>
+				<CrossTalkAmplitude>      0.150       </CrossTalkAmplitude>
+				<FocusWidth>              0.62        </FocusWidth>
+				<EFSAmplitude>            0.2         </EFSAmplitude>
+				<EFSRange>                0.9966      </EFSRange>
+				<FFSSmoothing>            0.186       </FFSSmoothing>
+			</u>
+		</rpp2x1>
+
+		<rpp1x2>
+			<f>
+				<FocusDeflectionPositions>
+					<pos phi="0" z="0"></pos>
+					<pos phi="0" z="1"></pos>
+				</FocusDeflectionPositions>
+				<zMode>                   Forward     </zMode>
+				<ChannelAlignment>        0.0         </ChannelAlignment>
+				<RadialInterpolationMode> Nuttal      </RadialInterpolationMode>
+				<ChannelResamplingMode>   Double      </ChannelResamplingMode>
+				<CrossTalkAmplitude>      0.210       </CrossTalkAmplitude>
+				<FocusWidth>              0.80        </FocusWidth>
+				<EFSAmplitude>            0.1         </EFSAmplitude>
+				<EFSRange>                2.2286      </EFSRange>
+				<FFSSmoothing>            0.0         </FFSSmoothing>
+				<FingerPrintFilter>       Virtual     </FingerPrintFilter>
+			</f>
+		</rpp1x2>
+
+		<rpp2x2>
+			<s>
+				<FocusDeflectionPositions>
+					<pos phi="0.5" z="0"></pos>
+					<pos phi="-0.5" z="0"></pos>
+					<pos phi="0.5" z="1"></pos>
+					<pos phi="-0.5" z="1"></pos>
+				</FocusDeflectionPositions>
+				<zMode>                   Forward     </zMode>
+				<ChannelAlignment>        0.0         </ChannelAlignment>
+				<RadialInterpolationMode> Linear      </RadialInterpolationMode>
+				<ChannelResamplingMode>   NoChange    </ChannelResamplingMode>
+				<CrossTalkAmplitude>      0.210       </CrossTalkAmplitude>
+				<FocusWidth>              0.80        </FocusWidth>
+				<EFSAmplitude>            0.1         </EFSAmplitude>
+				<EFSRange>                2.2286      </EFSRange>
+				<FFSSmoothing>            0.326       </FFSSmoothing>
+				<FingerPrintFilter>       Virtual     </FingerPrintFilter>
+			</s>
+			<h>
+				<FocusDeflectionPositions>
+					<pos phi="0.5" z="0"></pos>
+					<pos phi="-0.5" z="0"></pos>
+					<pos phi="0.5" z="1"></pos>
+					<pos phi="-0.5" z="1"></pos>
+				</FocusDeflectionPositions>
+				<zMode>                   Forward     </zMode>
+				<ChannelAlignment>        0.0         </ChannelAlignment>
+				<RadialInterpolationMode> Nuttal      </RadialInterpolationMode>
+				<ChannelResamplingMode>   Upsample2   </ChannelResamplingMode>
+				<CrossTalkAmplitude>      0.205       </CrossTalkAmplitude>
+				<FocusWidth>              0.62        </FocusWidth>
+				<EFSAmplitude>            0.1         </EFSAmplitude>
+				<EFSRange>                2.2286      </EFSRange>
+				<FFSSmoothing>            0.250       </FFSSmoothing>
+			</h>
+			<u>
+				<FocusDeflectionPositions>
+					<pos phi="0.5" z="0"></pos>
+					<pos phi="-0.5" z="0"></pos>
+					<pos phi="0.5" z="1"></pos>
+					<pos phi="-0.5" z="1"></pos>
+				</FocusDeflectionPositions>
+				<zMode>                   Forward     </zMode>
+				<ChannelAlignment>        0.0         </ChannelAlignment>
+				<RadialInterpolationMode> Nuttal      </RadialInterpolationMode>
+				<ChannelResamplingMode>   Upsample2   </ChannelResamplingMode>
+				<CrossTalkAmplitude>      0.150       </CrossTalkAmplitude>
+				<FocusWidth>              0.62        </FocusWidth>
+				<EFSAmplitude>            0.2         </EFSAmplitude>
+				<EFSRange>                0.9966      </EFSRange>
+				<FFSSmoothing>            0.186       </FFSSmoothing>
+			</u>
+		</rpp2x2>
+	</FFS>
+
+	<TriggerAndPulsing>
+		<MinQRSProcessTime>37</MinQRSProcessTime>
+		<SignalRiseTime>20</SignalRiseTime>
+		<SignalFallTime>40</SignalFallTime>
+
+		<XRayFractionLowDose>0.25</XRayFractionLowDose>
+		<XrayFractionMinDose>0.04</XrayFractionMinDose>
+		<TransitionAngle>0.083333</TransitionAngle>
+	</TriggerAndPulsing>
+
+</ScannerGeometry>

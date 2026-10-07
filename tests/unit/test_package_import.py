@@ -1,4 +1,6 @@
-def test_ctbasics_package_imports():
-    import ctbasics
+def test_ctbasics_package_exposes_matlab_domains():
+    import CTBasics
 
-    assert ctbasics.__all__ == []
+    for name in ("ScanDescriptor", "CreatePhantom", "ForwardProjection", "Backprojection", "Constants"):
+        assert name in CTBasics.__all__
+        assert hasattr(CTBasics, name)

@@ -25,7 +25,7 @@ No MATLAB runtime is required for the Python validation path. The external raw-d
 
 ## Architecture
 
-The Python package mirrors the MATLAB domain structure under `src/ctbasics`:
+The Python package mirrors the MATLAB folder and file names one-to-one under `CTBasics/`:
 
 1. `Descriptors/`: scan geometry, scan parameters, and descriptor-based setup.
 2. `Simulation/`: phantom creation, motion, spectra, materials, and noise.
@@ -33,9 +33,9 @@ The Python package mirrors the MATLAB domain structure under `src/ctbasics`:
 4. `Preprocessing/`: beam-hardening and filtering helpers.
 5. `ReadAndWrite/`: configuration and file-access helpers.
 6. `Visualization/`: geometry and imaging plots.
-7. `Apps/`: higher-level user-facing entry points such as `ColliScript` and `MAR`.
+7. `Apps/` and `Scripts/`: higher-level entry points such as `MAR` and `ColliScript`.
 
-Compatibility wrappers are intentionally thin. The goal is to keep the original MATLAB naming while delegating to the Python implementation.
+There are no wrapper or shim modules. Every MATLAB `classdef` file maps to one Python module of the same name holding one class of the same name, and MATLAB method names are kept verbatim.
 
 ## Coding guidelines
 
@@ -43,7 +43,7 @@ Follow these principles:
 
 - Search for existing functionality before implementing new behavior.
 - Prefer extension of existing modules over duplicate helper logic.
-- Use real Python names and package conventions, but keep MATLAB-style module names available through wrappers.
+- Use the MATLAB folder, file, class, and method names verbatim.
 - Document non-obvious numerical assumptions and geometric conventions.
 - Keep the structure aligned to the MATLAB repository to reduce migration overhead.
 

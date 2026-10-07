@@ -1,8 +1,8 @@
-from ctbasics.descriptors import ScanDescriptor, ScanTypes, ScannerGeometryTypes
+from CTBasics.Descriptors import ScanDescriptor, ScanTypes, ScannerGeometryTypes
 
 
 def test_scan_descriptor_factory_creates_fan_spiral():
-    descriptor = ScanDescriptor.create(ScannerGeometryTypes.Fan, ScanTypes.Spiral)
+    descriptor = ScanDescriptor.Create(ScannerGeometryTypes.Fan, ScanTypes.Spiral)
 
     assert descriptor.Geometry.BeamType == ScannerGeometryTypes.Fan
     assert descriptor.Parameter.ScanType == ScanTypes.Spiral
@@ -11,8 +11,8 @@ def test_scan_descriptor_factory_creates_fan_spiral():
 
 
 def test_scan_descriptor_copy_detaches_nested_objects():
-    descriptor = ScanDescriptor.create(ScannerGeometryTypes.Fan, ScanTypes.Spiral)
-    copied = descriptor.copy()
+    descriptor = ScanDescriptor.Create(ScannerGeometryTypes.Fan, ScanTypes.Spiral)
+    copied = descriptor.Copy()
 
     assert copied is not descriptor
     assert copied.Geometry is not descriptor.Geometry

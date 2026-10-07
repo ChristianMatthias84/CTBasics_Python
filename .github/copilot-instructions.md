@@ -26,7 +26,7 @@ Add comments where algorithmic assumptions or numerical behavior are non-obvious
 
 ## 5. Python-porting rules
 
-- Keep the repository layout aligned with the MATLAB project structure.
-- Provide MATLAB-style wrapper modules when compatibility matters.
+- Keep the repository layout aligned with the MATLAB project structure under `CTBasics/`.
+- Use the MATLAB folder, file, class, and method names verbatim; do not add wrapper modules.
 - Keep raw-data and external toolbox dependencies deferred unless explicitly requested.
 - Validate through focused pytest runs and document the checks.
