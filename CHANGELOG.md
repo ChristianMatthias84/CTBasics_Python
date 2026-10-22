@@ -6,6 +6,7 @@ commit, under the current date. Details belong in the commit message, not here.
 
 ## 2026-10-22
 
+- `LibraryConcept.md`: responsibility of every package defined.
 - Added `KNOWN_ISSUES.md` and `CHANGELOG.md`; the migration folder with MATLAB parity tools
   and references was removed.
 - Added `LibraryConcept.md` and the repository `ONBOARDING.md`. MATLAB is no longer the

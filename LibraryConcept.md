@@ -46,8 +46,9 @@ its concepts may depart from the original.
 flowchart TB
     subgraph Apps["Applications"]
         L[LecturesAndTestScripts]
-        P[Projects/StaticCT]
-        A[Apps: MAR]
+        P[Projects]
+        A[Apps]
+        SC[Scripts]
         B[Benchmarks]
     end
     subgraph Core["Core pipeline"]
@@ -61,25 +62,33 @@ flowchart TB
         MC[MultiCore]
         M[Memory]
         IO[ReadAndWrite]
-        V[Visualization / ImageManipulation]
+        IM[ImageManipulation]
+        V[Visualization]
     end
     Apps --> Core
     Core --> Infra
     Apps --> Infra
 ```
 
-| Layer | Package | Responsibility | Key classes |
+| Layer | Package | Responsibility | Key classes / contents |
 |---|---|---|---|
-| Core | `Descriptors/` | What is scanned and how: geometry, scan parameters, sampling, volumes | `ScanDescriptor`, `FanBeam`, `ParallelBeam`, `StaticCTBeam`, `Spiral`, `Sequence`, `AzimuthalSampling`, `FlyingFocalSpot`, `Simulation`, `Reconstruction` |
-| Core | `Simulation/` | Object and physics | `CreatePhantom`, `Noise`, `Spectra`, `SpectralProperties`, `Materials`, `MaterialProperties` |
-| Core | `Reconstruction/` | Projection-domain and image-domain algorithms | `ForwardProjection`, `Rebinning`, `Kernels`, `MoireFilter`, `Convolution`, `Backprojection`, `Constants` |
-| Core | `Preprocessing/` | Corrections of measured or simulated projections | `WBHC` (water beam-hardening correction) |
-| Core (optional) | `RawData/` | Reading of scanner raw data into descriptors | `RawDataScanDescriptor`, `ReadRawDataFunctions`, `RawDataHelperFunctions` |
-| Infrastructure | `MultiCore/` | Parallel execution and work partitioning | `Parallelization`, `CPU`, `RAM`, `Partition.SequenceStacks`, `Partition.SpiralStacks` |
-| Infrastructure | `Memory/` | Working precision and allocation | `Precision`, `Allocation`, `TypeCast` |
-| Infrastructure | `ReadAndWrite/` | Configuration, paths, file I/O, DICOM | `IOHelperFunctions` |
-| Infrastructure | `Visualization/`, `ImageManipulation/` | Plots and image tools | |
-| Applications | `LecturesAndTestScripts/`, `Projects/`, `Apps/`, `Benchmarks/`, `Scripts/` | Runnable scripts built on the core | `main(...)` per script |
+| Core | `Descriptors/` | Descriptions of the system and the scan: geometries, scan sequences (protocols, sampling), volumes. The system tables that geometries are read from live in `RawData/Tables/` | `ScanDescriptor`, `FanBeam`, `ParallelBeam`, `StaticCTBeam`, `Spiral`, `Sequence`, `AzimuthalSampling`, `FlyingFocalSpot`, `Simulation`, `Reconstruction` |
+| Core | `Simulation/` | Everything simulated: phantoms, spectra, materials, noise, motion | `CreatePhantom`, `Noise`, `Spectra`, `SpectralProperties`, `Materials`, `MaterialProperties` |
+| Core | `Reconstruction/` | Forward projection and backprojection, and all reconstruction methods with their steps (rebinning, kernels, filtering) | `ForwardProjection`, `Rebinning`, `Kernels`, `MoireFilter`, `Convolution`, `Backprojection`, `Constants` |
+| Core | `Preprocessing/` | All routines of the preprocessing chain applied to measured or simulated projections | `WBHC` (water beam-hardening correction) |
+| Core (optional) | `RawData/` | Everything for reading scanner raw data (reading routines, raw-data descriptors), plus the system-describing tables and XML files needed to understand the system geometries (`Tables/<System>/Geometry.xml`, `Beta_*.IRSTBL`) | `RawDataScanDescriptor`, `ReadRawDataFunctions`, `RawDataHelperFunctions` |
+| Infrastructure | `MultiCore/` | Everything parallelization-specific, CPU or GPU: execution, thread/worker setup, work partitioning | `Parallelization`, `CPU`, `RAM`, `Partition.SequenceStacks`, `Partition.SpiralStacks` |
+| Infrastructure | `Memory/` | Dedicated memory management: working precision, allocation, type casts | `Precision`, `Allocation`, `TypeCast` |
+| Infrastructure | `ReadAndWrite/` | Reading and writing data and data formats (configuration, paths, files, DICOM); not raw data, which belongs in `RawData/` | `IOHelperFunctions` |
+| Infrastructure | `ImageManipulation/` | General-purpose image processing that is not specific to the imaging pipeline (resampling, ...) | `ImageManipulation` |
+| Infrastructure | `Visualization/` | Everything for visualization: plots, figures, image display | `StaticCTVisualizationFunctionalitites` |
+| Applications | `Apps/` | Stand-alone applications (to be extended); currently metal artifact reduction | `MAR` |
+| Applications | `Projects/` | Project-specific scripts and tools | `Projects/StaticCT/...` |
+| Applications | `LecturesAndTestScripts/` | Test scripts for lectures and teaching, also used as end-to-end checks | `CTRecon101`, `TestScript2D`, `TestScript3D`, ... |
+| Applications | `Scripts/` | Miscellaneous scripts that belong to no project | `ColliScript` |
+| Applications | `Benchmarks/` | Runtime measurements | |
+
+Each script exposes `main(...)` (see section 8).
 
 Dependencies point downwards only: applications use the core and the infrastructure, and the
 core uses the infrastructure. The core never imports from applications.
@@ -218,10 +227,19 @@ their result in the output folder under a file name derived from the descriptor.
 |---|---|
 | New scanner geometry | `Descriptors/Geometries/`, plus a branch in `ScanDescriptor.Create`, `ParallelBeam.__init__`, and the volume initialisers |
 | New scan protocol | `Descriptors/ScanParameter/` |
-| New phantom, motion, or physics effect | `Simulation/` (phantoms in `CreatePhantom`) |
-| New projector, rebinning, kernel, or backprojector | Matching class in `Reconstruction/`; hot loop as a private numba kernel in the same module |
-| Projection corrections | `Preprocessing/` |
-| Experiment or study | `Projects/<Topic>/`. For Static CT, personal experiments go into `ProjectsAH`/`ProjectsCH`/`ProjectsJP`; shared helpers (`DualSource_*`, `StaticCT_*`) are collected in `StaticCTHelperFunctions/`, so check these before adding more |
-| Teaching or verification script | `LecturesAndTestScripts/` |
+| System tables or XML files of a scanner | `RawData/Tables/<System>/` |
+| Raw-data reading routine | `RawData/` |
+| New phantom, motion, spectrum, noise, or physics effect | `Simulation/` (phantoms in `CreatePhantom`) |
+| New projector, rebinning, kernel, backprojector, or reconstruction method | Matching class in `Reconstruction/`; hot loop as a private numba kernel in the same module |
+| Step of the preprocessing chain | `Preprocessing/` |
+| Parallelization (CPU or GPU) | `MultiCore/` |
+| Memory management | `Memory/` |
+| Reading or writing a data format (not raw data) | `ReadAndWrite/` |
+| General image processing, not pipeline-specific | `ImageManipulation/` |
+| Plots and display | `Visualization/` |
+| Stand-alone application | `Apps/` |
+| Experiment, study, or project tool | `Projects/<Topic>/`. For Static CT, personal experiments go into `ProjectsAH`/`ProjectsCH`/`ProjectsJP`; shared helpers (`DualSource_*`, `StaticCT_*`) are collected in `StaticCTHelperFunctions/`, so check these before adding more |
+| Lecture or teaching test script | `LecturesAndTestScripts/` |
+| Miscellaneous script without a project | `Scripts/` |
 
 Search for existing functionality first; see the general guidelines.
