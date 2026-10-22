@@ -1,7 +1,7 @@
 import math
 
-from ..ScannerGeometryTypes import ScannerGeometryTypes
-from ..ScanTypes import ScanTypes
+from CTBasics.Descriptors.ScannerGeometryTypes import ScannerGeometryTypes
+from CTBasics.Descriptors.ScanTypes import ScanTypes
 
 TWO_PI = 2 * math.pi
 

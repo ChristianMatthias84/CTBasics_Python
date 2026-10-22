@@ -1,8 +1,10 @@
+import functools
+
 import numpy as np
 
-from ..Memory.Allocation import Allocation
-from ..Reconstruction.Constants import Constants
-from .Materials import Materials
+from CTBasics.Memory.Allocation import Allocation
+from CTBasics.Reconstruction.Constants import Constants
+from CTBasics.Simulation.Materials import Materials
 
 
 
@@ -42,11 +44,40 @@ _RESPIRATORY_STRUCTURES = (
 )
 
 
+def _Axes(Nx, dx, x0, Ny, dy, y0):
+    """Voxel centre coordinates along x and y, matching the MATLAB nx/ny loops."""
+    return x0 + np.arange(1, Nx + 1) * dx, y0 + np.arange(1, Ny + 1) * dy
+
+
 def _Grid(Nx, dx, x0, Ny, dy, y0):
-    """Voxel centre coordinates as (Ny, Nx) arrays, matching the MATLAB nx/ny loops."""
-    x = x0 + np.arange(1, Nx + 1) * dx
-    y = y0 + np.arange(1, Ny + 1) * dy
-    return np.meshgrid(x, y)
+    """Voxel centre coordinates as (Ny, Nx) arrays."""
+    return np.meshgrid(*_Axes(Nx, dx, x0, Ny, dy, y0))
+
+
+@functools.lru_cache(maxsize=8)
+def _WaterDisc(Nx, dx, x0, Ny, dy, y0):
+    """Read-only mask of the static water disc; the dynamic phantoms rebuild every view."""
+    X, Y = _Grid(Nx, dx, x0, Ny, dy, y0)
+    mask = X * X + Y * Y <= _R_WATER ** 2
+    mask.flags.writeable = False
+    return mask
+
+
+def _Window(Nx, dx, x0, Ny, dy, y0, xcenter, ycenter, r):
+    """Index window and local (X, Y) grid of the voxels within r of the centre.
+
+    Two voxels of margin keep every voxel the full-grid tests could select. Returns None
+    when the window lies outside the image.
+    """
+    x, y = _Axes(Nx, dx, x0, Ny, dy, y0)
+    ix = np.flatnonzero(np.abs(x - xcenter) <= r + 2 * abs(dx))
+    iy = np.flatnonzero(np.abs(y - ycenter) <= r + 2 * abs(dy))
+    if ix.size == 0 or iy.size == 0:
+        return None
+
+    window = (slice(iy[0], iy[-1] + 1), slice(ix[0], ix[-1] + 1))
+    X, Y = np.meshgrid(x[window[1]], y[window[0]])
+    return window, X, Y
 
 
 def _StentCenters(r0):
@@ -84,6 +115,19 @@ def _PaintStents(Slice, X, Y, xDisplacement, yDisplacement, r0):
         dX = X - (xDisplacement + xs)
         dY = Y - (yDisplacement + ys)
         Slice[dX * dX + dY * dY <= _R_STENT ** 2] = _MU_STENT
+
+
+def _PaintCardiacArtery(Slice, grid, xDisplacement, yDisplacement, CM, Plaque, Stent):
+    """Moving artery of the cardiac phantoms; the stent struts reach beyond the lumen."""
+    found = _Window(*grid, xDisplacement, yDisplacement, _R_LUMEN + _R_STENT)
+    if found is None:
+        return
+
+    window, X, Y = found
+    _PaintArtery(Slice[window], X - xDisplacement, Y - yDisplacement,
+                 _R_ARTERY, _R_LUMEN, CM, Plaque)
+    if Stent:
+        _PaintStents(Slice[window], X, Y, xDisplacement, yDisplacement, _R_LUMEN)
 
 
 # Each phantom is a stack of filled ellipses (mu, a, b, xcenter, ycenter) painted in order,
@@ -234,11 +278,13 @@ class CreatePhantom:
             xcenter = -100 + nz * 0.5
             Volume[nz - 1][CreatePhantom._EllipseMask(Nx, dx, x0, Ny, dy, y0, 20, 15, xcenter, 0)] = mu_b
 
-        # The right hip tapers with increasing slice index.
+        # The right hip tapers with increasing slice index. MATLAB compares against
+        # |b/a*sqrt(...)|, so slices with negative b still get an ellipse while a > 0;
+        # a <= 0 never selects a voxel (a == 0 yields NaN in MATLAB).
         for nz in range(zstart, zstop + 1):
             a = 25 - nz * 0.5
             b = 20 - nz * 0.5
-            if a <= 0 or b <= 0:
+            if a <= 0:
                 continue
             Volume[nz - 1][CreatePhantom._EllipseMask(Nx, dx, x0, Ny, dy, y0, a, b, 100, 0)] = mu_b
 
@@ -311,9 +357,7 @@ class CreatePhantom:
         Phantom = Allocation.zeros(Nx * Ny)
         Slice = Phantom.reshape(Ny, Nx)
 
-        X, Y = _Grid(Nx, dx, x0, Ny, dy, y0)
-
-        Slice[X * X + Y * Y <= _R_WATER ** 2] = _MuW
+        Slice[_WaterDisc(Nx, dx, x0, Ny, dy, y0)] = _MuW
 
         # Displacement model follows the LR/PA motion reported in PMC2396264.
         omega = 2 * np.pi / HeartBeatCycleDuration
@@ -322,11 +366,8 @@ class CreatePhantom:
         xDisplacement = 2 * _R_ARTERY * norm_displacement * np.sin(Direction)
         yDisplacement = 2 * _R_ARTERY * norm_displacement * np.cos(Direction)
 
-        _PaintArtery(Slice, X - xDisplacement, Y - yDisplacement,
-                     _R_ARTERY, _R_LUMEN, CM, Plaque)
-
-        if Stent:
-            _PaintStents(Slice, X, Y, xDisplacement, yDisplacement, _R_LUMEN)
+        _PaintCardiacArtery(Slice, (Nx, dx, x0, Ny, dy, y0), xDisplacement, yDisplacement,
+                            CM, Plaque, Stent)
 
         return Phantom, isSpectral, xDisplacement, yDisplacement
 
@@ -352,8 +393,8 @@ class CreatePhantom:
         isSpectral = False
         RoI = np.array([[xDisplacement], [yDisplacement]], dtype=float)
 
-        X, Y = _Grid(Nx, dx, x0, Ny, dy, y0)
-        water = X * X + Y * Y <= _R_WATER ** 2
+        grid = (Nx, dx, x0, Ny, dy, y0)
+        water = _WaterDisc(*grid)
 
         if SelectedPhantom == "WaterOnly":
             # Deliberately static so a ROI measures pure noise.
@@ -361,10 +402,7 @@ class CreatePhantom:
 
         elif SelectedPhantom == "Cardiac":
             Slice[water] = _MuW
-            _PaintArtery(Slice, X - xDisplacement, Y - yDisplacement,
-                         _R_ARTERY, _R_LUMEN, CM, Plaque)
-            if Stent:
-                _PaintStents(Slice, X, Y, xDisplacement, yDisplacement, _R_LUMEN)
+            _PaintCardiacArtery(Slice, grid, xDisplacement, yDisplacement, CM, Plaque, Stent)
 
         elif SelectedPhantom == "TemporalIodinePhantom":
             # Only the iodine concentration changes; the vessels stay in place.
@@ -396,15 +434,22 @@ class CreatePhantom:
                 rVessel = vesselRadii[iVessel - 1]
                 rWallOuter = rVessel + vesselWallThickness
 
+                found = _Window(*grid, vesselCenterX[iVessel - 1], vesselCenterY[iVessel - 1],
+                                rWallOuter)
+                if found is None:
+                    continue
+                window, X, Y = found
+                Vessel = Slice[window]
+
                 dX = X - vesselCenterX[iVessel - 1]
                 dY = Y - vesselCenterY[iVessel - 1]
                 dist2 = dX * dX + dY * dY
 
-                Slice[(dist2 <= rWallOuter ** 2) & (dist2 > rVessel ** 2)] = mu_art
+                Vessel[(dist2 <= rWallOuter ** 2) & (dist2 > rVessel ** 2)] = mu_art
 
                 lumen = dist2 <= rVessel ** 2
                 iodine = mu_iodine_max * cmNorm * np.exp(-dist2 / (2 * sigmaCM ** 2))
-                Slice[lumen] = mu_blood + iodine[lumen]
+                Vessel[lumen] = mu_blood + iodine[lumen]
 
         elif SelectedPhantom == "WaterWith4Arteries":
             Slice[water] = _MuW
@@ -416,27 +461,34 @@ class CreatePhantom:
 
             # Artery 1 carries stents, arteries 2..4 carry half/quarter/eighth plaque.
             for iArtery in range(1, 5):
+                found = _Window(*grid, xDisplacement + xArteryCenter[iArtery - 1],
+                                yDisplacement + yArteryCenter[iArtery - 1], _R_ARTERY)
+                if found is None:
+                    continue
+                window, X, Y = found
+                Artery = Slice[window]
+
                 xLocal = X - xDisplacement - xArteryCenter[iArtery - 1]
                 yLocal = Y - yDisplacement - yArteryCenter[iArtery - 1]
                 dist = xLocal * xLocal + yLocal * yLocal
 
                 lumen = dist <= _R_LUMEN ** 2
 
-                Slice[(dist <= _R_ARTERY ** 2) & ~lumen] = _MU_ART
-                Slice[lumen] = _MU_BLOOD_CM if CM else _MU_BLOOD
+                Artery[(dist <= _R_ARTERY ** 2) & ~lumen] = _MU_ART
+                Artery[lumen] = _MU_BLOOD_CM if CM else _MU_BLOOD
 
                 if iArtery == 2:
-                    Slice[lumen & (xLocal >= 0)] = _MU_PLAQUE
+                    Artery[lumen & (xLocal >= 0)] = _MU_PLAQUE
                 elif iArtery == 3:
-                    Slice[lumen & (xLocal >= 0) & (yLocal <= 0)] = _MU_PLAQUE
+                    Artery[lumen & (xLocal >= 0) & (yLocal <= 0)] = _MU_PLAQUE
                 elif iArtery == 4:
                     # MATLAB negates the quarter condition here, so this covers 3/4 of the lumen.
-                    Slice[lumen & ~((xLocal >= 0) & (yLocal <= 0))] = _MU_PLAQUE
+                    Artery[lumen & ~((xLocal >= 0) & (yLocal <= 0))] = _MU_PLAQUE
                 elif iArtery == 1:
                     for xs, ys in _StentCenters(_R_LUMEN):
                         dXs = xLocal - xs
                         dYs = yLocal - ys
-                        Slice[lumen & (dXs * dXs + dYs * dYs <= _R_STENT ** 2)] = _MU_STENT
+                        Artery[lumen & (dXs * dXs + dYs * dYs <= _R_STENT ** 2)] = _MU_STENT
 
             RoI = np.vstack([xArteryCenter + xDisplacement, yArteryCenter + yDisplacement])
 
@@ -452,6 +504,7 @@ class CreatePhantom:
             centers = (-3 * LineWidth, -LineWidth, LineWidth, 3 * LineWidth)
 
             # MATLAB centres the water disc on `Center` as well as the line pattern.
+            X, Y = _Grid(*grid)
             inside = (X - cx) ** 2 + (Y - cy) ** 2 <= _R_WATER ** 2
             Slice[inside] = _MuW
 
@@ -470,6 +523,7 @@ class CreatePhantom:
 
             mu_lung = 0.0
             mu_tissue = _MuW
+            X, Y = _Grid(*grid)
 
             Slice[CreatePhantom._EllipseMask(Nx, dx, x0, Ny, dy, y0, 150, 100, 0, 0)] = _MuW
 

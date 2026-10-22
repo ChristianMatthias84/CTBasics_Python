@@ -3,7 +3,7 @@ import numpy as np
 from CTBasics.Descriptors import FocalSpotSimulationStaticCT, ScannerGeometryTypes
 from CTBasics.Reconstruction import ForwardProjection
 from CTBasics.Scripts.ColliScript import CreateExampleLeafCollimatorConfig
-from CTBasics.Visualization import VisualizationTests
+from CTBasics.Visualization import StaticCTVisualizationFunctionalitites
 
 
 def test_static_ct_focal_spot_sampling_positions_shape_and_symmetry():
@@ -15,8 +15,8 @@ def test_static_ct_focal_spot_sampling_positions_shape_and_symmetry():
 
 
 def test_default_static_ct_descriptor_and_leaf_config():
-    descriptor = VisualizationTests.CreateDefaultStaticCTDescriptor()
-    geometry = VisualizationTests.ResolveStaticCTGeometry(descriptor)
+    descriptor = StaticCTVisualizationFunctionalitites.CreateDefaultStaticCTDescriptor()
+    geometry = StaticCTVisualizationFunctionalitites.ResolveStaticCTGeometry(descriptor)
     leaf_config = CreateExampleLeafCollimatorConfig(geometry)
 
     assert descriptor.Geometry.BeamType == ScannerGeometryTypes.StaticCT
@@ -27,7 +27,7 @@ def test_default_static_ct_descriptor_and_leaf_config():
 
 
 def _small_static_ct_descriptor():
-    descriptor = VisualizationTests.CreateDefaultStaticCTDescriptor()
+    descriptor = StaticCTVisualizationFunctionalitites.CreateDefaultStaticCTDescriptor()
     descriptor.Geometry.MDelta = 8
     descriptor.Geometry.Ns = 4
     descriptor.Geometry.dDelta = 2.0 * np.pi / descriptor.Geometry.MDelta
@@ -161,7 +161,7 @@ def _plt():
 
 def test_rebin_variables_plot_shows_the_fan_angle_relation():
     _plt()
-    axes = VisualizationTests.ShowRebinVariables2D()
+    axes = StaticCTVisualizationFunctionalitites.ShowRebinVariables2D()
 
     beta_curve, identity = axes.get_lines()
     betaDash, beta = beta_curve.get_data()
@@ -174,7 +174,7 @@ def test_rebin_variables_plot_shows_the_fan_angle_relation():
 
 def test_ring_sketch_draws_source_and_detector_rings():
     _plt()
-    axes = VisualizationTests.ShowRingSketch3D()
+    axes = StaticCTVisualizationFunctionalitites.ShowRingSketch3D()
 
     radii = [float(np.hypot(*line.get_data()).max()) for line in axes.get_lines()]
 
@@ -184,7 +184,7 @@ def test_ring_sketch_draws_source_and_detector_rings():
 
 def test_rebinned_geometry_lines_are_equidistant_and_widest_in_the_centre():
     _plt()
-    axes, surface = VisualizationTests.ShowRebinnedGeometry3D()
+    axes, surface = StaticCTVisualizationFunctionalitites.ShowRebinnedGeometry3D()
 
     xi = axes.get_lines()[0].get_xdata()
     z = np.array([line.get_ydata() for line in axes.get_lines()])
@@ -205,7 +205,7 @@ def test_static_ct_geometry_plot_uses_the_descriptor_radii():
     _plt()
     descriptor = _small_static_ct_descriptor()
 
-    axes = VisualizationTests.ShowStaticCTGeometry3D(descriptor)
+    axes = StaticCTVisualizationFunctionalitites.ShowStaticCTGeometry3D(descriptor)
 
     radii = {round(float(np.hypot(*line.get_data()).max()), 1) for line in axes.get_lines()}
 
@@ -220,7 +220,7 @@ def test_static_ct_geometry_rejects_a_fan_beam():
     from CTBasics.Descriptors.Geometries.FanBeam import FanBeam
 
     with pytest.raises(ValueError):
-        VisualizationTests.ShowStaticCTGeometry3D(FanBeam())
+        StaticCTVisualizationFunctionalitites.ShowStaticCTGeometry3D(FanBeam())
 
 
 def test_collimation_view_returns_the_detector_illumination():
@@ -230,7 +230,7 @@ def test_collimation_view_returns_the_detector_illumination():
         nrOfWidthSamples=1, nrOfLengthSamples=3
     )
 
-    collimation, detectorImage = VisualizationTests.ShowStaticCTCollimation3D(
+    collimation, detectorImage = StaticCTVisualizationFunctionalitites.ShowStaticCTCollimation3D(
         descriptor, focalSpotSamples=focal_spots
     )
 
@@ -241,7 +241,7 @@ def test_collimation_view_returns_the_detector_illumination():
 
 def test_collimation_view_can_skip_the_illumination():
     _plt()
-    collimation, detectorImage = VisualizationTests.ShowStaticCTCollimation3D(
+    collimation, detectorImage = StaticCTVisualizationFunctionalitites.ShowStaticCTCollimation3D(
         _small_static_ct_descriptor(), computeIllumination=False
     )
 
@@ -254,7 +254,7 @@ def test_multi_leaf_view_requires_a_leaf_configuration():
 
     _plt()
     with pytest.raises(ValueError):
-        VisualizationTests.ShowStaticCTCollimation3DFromComputedDataLeaf(
+        StaticCTVisualizationFunctionalitites.ShowStaticCTCollimation3DFromComputedDataLeaf(
             _small_static_ct_descriptor()
         )
 
@@ -270,7 +270,7 @@ def test_multi_leaf_view_draws_two_edges_per_leaf():
         zLowerPerLeaf=np.linspace(-7.0, -8.0, NLeafs),
     )
 
-    VisualizationTests.ShowStaticCTCollimation3DFromComputedDataLeaf(
+    StaticCTVisualizationFunctionalitites.ShowStaticCTCollimation3DFromComputedDataLeaf(
         _small_static_ct_descriptor(),
         focalSpotSamples=np.zeros((1, 3)),
         LeafConfig=LeafConfig,

@@ -2,7 +2,7 @@ import os
 
 import psutil
 
-from .RAM import RAM
+from CTBasics.MultiCore.RAM import RAM
 
 
 class CPU:

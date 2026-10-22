@@ -1,6 +1,6 @@
-from .BaseScannerGeometry import BaseScannerGeometry
-from .FanBeam import FanBeam
-from .ParallelBeam import ParallelBeam
-from .StaticCTBeam import StaticCTBeam
+from CTBasics.Descriptors.Geometries.BaseScannerGeometry import BaseScannerGeometry
+from CTBasics.Descriptors.Geometries.FanBeam import FanBeam
+from CTBasics.Descriptors.Geometries.ParallelBeam import ParallelBeam
+from CTBasics.Descriptors.Geometries.StaticCTBeam import StaticCTBeam
 
 __all__ = ["BaseScannerGeometry", "FanBeam", "ParallelBeam", "StaticCTBeam"]

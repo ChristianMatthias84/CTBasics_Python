@@ -2,7 +2,7 @@ from pathlib import Path
 
 import numpy as np
 
-from .Spectra import Spectra
+from CTBasics.Simulation.Spectra import Spectra
 
 _SPECTRA = Path(__file__).parent / "spectra"
 

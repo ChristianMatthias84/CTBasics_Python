@@ -1,8 +1,8 @@
 import math
 
-from ..ScannerGeometryTypes import ScannerGeometryTypes
-from ..Sampling.AzimuthalSampling import AzimuthalSampling
-from .BaseScannerGeometry import BaseScannerGeometry
+from CTBasics.Descriptors.ScannerGeometryTypes import ScannerGeometryTypes
+from CTBasics.Descriptors.Sampling.AzimuthalSampling import AzimuthalSampling
+from CTBasics.Descriptors.Geometries.BaseScannerGeometry import BaseScannerGeometry
 
 _COPIED_PROPERTIES = (
     "RF", "RD", "RFD", "RC", "RM", "c", "Ns", "ds", "s0",

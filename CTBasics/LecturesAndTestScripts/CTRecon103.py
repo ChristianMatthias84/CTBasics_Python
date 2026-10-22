@@ -5,17 +5,17 @@ optional so the script runs without a CTBasicsConfig.txt.
 """
 import numpy as np
 
-from ..Preprocessing.WBHC import WBHC
-from ..Reconstruction.Backprojection import Backprojection
-from ..Reconstruction.Constants import Constants
-from ..Reconstruction.Convolution import Convolution
-from ..Reconstruction.ForwardProjection import ForwardProjection
-from ..Reconstruction.Kernels import Kernels
-from ..Reconstruction.Rebinning import Rebinning
-from ..Simulation.CreatePhantom import CreatePhantom
-from ..Simulation.Noise import Noise
-from ..Simulation.Spectra import Spectra
-from .CTRecon101 import _Save
+from CTBasics.Preprocessing.WBHC import WBHC
+from CTBasics.Reconstruction.Backprojection import Backprojection
+from CTBasics.Reconstruction.Constants import Constants
+from CTBasics.Reconstruction.Convolution import Convolution
+from CTBasics.Reconstruction.ForwardProjection import ForwardProjection
+from CTBasics.Reconstruction.Kernels import Kernels
+from CTBasics.Reconstruction.Rebinning import Rebinning
+from CTBasics.Simulation.CreatePhantom import CreatePhantom
+from CTBasics.Simulation.Noise import Noise
+from CTBasics.Simulation.Spectra import Spectra
+from CTBasics.LecturesAndTestScripts.CTRecon101 import _Save
 
 
 def main(Outputdirectory=None, ShowFigures=False, Reconkernel=Kernels.RamLak,
@@ -204,7 +204,7 @@ def main(Outputdirectory=None, ShowFigures=False, Reconkernel=Kernels.RamLak,
 def _ShowFigures(Voxelphantom, Nxsim, Nysim, FanProjections, MFan, NFan,
                  RebinnedProjections, FilteredProjections, M, Npar,
                  Kernel, ReconstructedImageHU, Nx, Ny):
-    from .CTRecon102 import _ShowFigures as _Show
+    from CTBasics.LecturesAndTestScripts.CTRecon102 import _ShowFigures as _Show
 
     _Show(Voxelphantom, Nxsim, Nysim, FanProjections, MFan, NFan,
           RebinnedProjections, FilteredProjections, M, Npar,

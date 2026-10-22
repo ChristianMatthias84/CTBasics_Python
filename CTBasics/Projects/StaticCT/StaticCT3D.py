@@ -4,20 +4,20 @@ Port of Projects/Static CT/StaticCT3D.m.
 """
 import numpy as np
 
-from ...Descriptors.Geometries.ParallelBeam import ParallelBeam
-from ...Descriptors.ScanDescriptor import ScanDescriptor
-from ...Descriptors.ScannerGeometryTypes import ScannerGeometryTypes
-from ...Descriptors.ScanTypes import ScanTypes
-from ...Descriptors.Volumes.Reconstruction import Reconstruction
-from ...Descriptors.Volumes.Simulation import Simulation
-from ...LecturesAndTestScripts.CTRecon101 import _Save
-from ...Reconstruction.Backprojection import Backprojection
-from ...Reconstruction.Constants import Constants
-from ...Reconstruction.Convolution import Convolution
-from ...Reconstruction.ForwardProjection import ForwardProjection
-from ...Reconstruction.Kernels import Kernels
-from ...Reconstruction.Rebinning import Rebinning
-from ...Simulation.CreatePhantom import CreatePhantom
+from CTBasics.Descriptors.Geometries.ParallelBeam import ParallelBeam
+from CTBasics.Descriptors.ScanDescriptor import ScanDescriptor
+from CTBasics.Descriptors.ScannerGeometryTypes import ScannerGeometryTypes
+from CTBasics.Descriptors.ScanTypes import ScanTypes
+from CTBasics.Descriptors.Volumes.Reconstruction import Reconstruction
+from CTBasics.Descriptors.Volumes.Simulation import Simulation
+from CTBasics.LecturesAndTestScripts.CTRecon101 import _Save
+from CTBasics.Reconstruction.Backprojection import Backprojection
+from CTBasics.Reconstruction.Constants import Constants
+from CTBasics.Reconstruction.Convolution import Convolution
+from CTBasics.Reconstruction.ForwardProjection import ForwardProjection
+from CTBasics.Reconstruction.Kernels import Kernels
+from CTBasics.Reconstruction.Rebinning import Rebinning
+from CTBasics.Simulation.CreatePhantom import CreatePhantom
 
 
 def main(aScanType=ScanTypes.Spiral, Outputdirectory=None, ShowFigures=False,

@@ -1,8 +1,8 @@
 import math
 
-from ..ScannerGeometryTypes import ScannerGeometryTypes
-from ..ScanTypes import ScanTypes
-from .BaseScanParameter import BaseScanParameter
+from CTBasics.Descriptors.ScannerGeometryTypes import ScannerGeometryTypes
+from CTBasics.Descriptors.ScanTypes import ScanTypes
+from CTBasics.Descriptors.ScanParameter.BaseScanParameter import BaseScanParameter
 
 
 class Sequence(BaseScanParameter):
@@ -70,7 +70,7 @@ class Sequence(BaseScanParameter):
 
     def Load(self, DataDescriptor_in):
         """Reads the scan blocks of a measured sequence acquisition."""
-        from ...RawData.RawDataScanDescriptor import RawDataScanDescriptor
+        from CTBasics.RawData.RawDataScanDescriptor import RawDataScanDescriptor
 
         self.ClearState()
 

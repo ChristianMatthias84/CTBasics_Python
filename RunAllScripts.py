@@ -17,6 +17,7 @@ SCRIPTS = [
     "CTBasics.Projects.StaticCT.StaticCT3D",
     "CTBasics.Projects.StaticCT.ProjectsAH.DualSource."
     "DualSource_CardiacMotion4DCT_Main",
+    "CTBasics.Projects.StaticCT.ProjectsAH.sweeps.StaticCT_JP_HeartRateVsNSubsets_Sweep",
     "CTBasics.Projects.StaticCT.ProjectsJP.test_4DCT_prosp",
     "CTBasics.Projects.StaticCT.ProjectsCH.StaticCT_4_RealTimeImaging_Script_CH",
 ]

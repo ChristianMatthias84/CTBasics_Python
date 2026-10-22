@@ -1,7 +1,7 @@
 """Precision handling, allocation and type casting."""
 
-from .Allocation import Allocation
-from .Precision import Precision
-from .TypeCast import TypeCast
+from CTBasics.Memory.Allocation import Allocation
+from CTBasics.Memory.Precision import Precision
+from CTBasics.Memory.TypeCast import TypeCast
 
 __all__ = ["Allocation", "Precision", "TypeCast"]

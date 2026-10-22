@@ -1,9 +1,9 @@
 import numpy as np
 
-from ..Memory.Allocation import Allocation
-from ..Simulation.Materials import Materials
-from ..Simulation.MaterialProperties import MaterialProperties
-from ..Simulation.SpectralProperties import _SpectralBins
+from CTBasics.Memory.Allocation import Allocation
+from CTBasics.Simulation.Materials import Materials
+from CTBasics.Simulation.MaterialProperties import MaterialProperties
+from CTBasics.Simulation.SpectralProperties import _SpectralBins
 
 
 class WBHC:

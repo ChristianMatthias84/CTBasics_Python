@@ -1,8 +1,10 @@
+import numba
 import numpy as np
 
-from ..Memory.Allocation import Allocation
-from ..MultiCore.Partition.SequenceStacks import SequenceStacks
-from ..MultiCore.Partition.SpiralStacks import SpiralStacks
+from CTBasics.Memory.Allocation import Allocation
+from CTBasics.MultiCore.Parallelization import Parallelization
+from CTBasics.MultiCore.Partition.SequenceStacks import SequenceStacks
+from CTBasics.MultiCore.Partition.SpiralStacks import SpiralStacks
 
 
 def _fix(value):
@@ -10,33 +12,183 @@ def _fix(value):
     return int(value)
 
 
-
-
 def _fix_array(values):
     """Vectorized MATLAB fix() returning integer indices."""
     return np.trunc(values).astype(np.int64)
 
 
-def _InPlaneRay(theta, x0, dx, Nx, y0, dy, Ny, xi0, dxi, M):
-    """Channel coordinate of every pixel for one parallel view.
+# The numba kernels below give every image row its own thread and add the views in their
+# serial order, so the result does not depend on the number of threads.
 
-    Returns (mreal, m, wm, valid, xi, cc, ss) with the (Ny, Nx) arrays of the MATLAB
-    expression mreal = a*nx + b*ny + c for a = dx*cos/dxi, b = dy*sin/dxi.
+@numba.njit(parallel=True, cache=True)
+def _BackprojectParallelViews(a, b, c, norm, Sino, M, Nx, Ny, Reconstruction):
+    """Adds view n / norm[n] of every parallel view to Reconstruction.
+
+    View n samples the channel mreal = a[n]*nx + b[n]*ny + c[n] of Sino[n*M:(n+1)*M].
     """
+    for j in numba.prange(Ny):
+        ny = j + 1
+        row = j * Nx
+        for n in range(a.size):
+            base = n * M
+            for nx in range(1, Nx + 1):
+                mreal = a[n] * nx + b[n] * ny + c[n]
+                m = int(mreal)
+                if 1 <= m < M:
+                    w = mreal - m
+                    Reconstruction[row + nx - 1] += (
+                        (1 - w) * Sino[base + m - 1] + w * Sino[base + m]) / norm[n]
+
+
+@numba.njit(parallel=True, cache=True)
+def _WFBP2DViews(a, b, c, Npi, Sino, M, Nx, Ny, Reconstruction):
+    """Adds the per-voxel average of every half-turn group nthetaBar, nthetaBar + Npi, ..."""
+    for j in numba.prange(Ny):
+        ny = j + 1
+        row = j * Nx
+        for nthetaBar in range(Npi):
+            for nx in range(1, Nx + 1):
+                Vxy = 0.0
+                Hxy = 0.0
+                for n in range(nthetaBar, a.size, Npi):
+                    mreal = a[n] * nx + b[n] * ny + c[n]
+                    m = int(mreal)
+                    if 1 <= m < M:
+                        w = mreal - m
+                        Vxy += (1 - w) * Sino[n * M + m - 1] + w * Sino[n * M + m]
+                        Hxy += 1.0
+                if Hxy > 0:
+                    Reconstruction[row + nx - 1] += Vxy / Hxy
+
+
+def _ParallelViewCoefficients(theta, x0, dx, y0, dy, xi0, dxi):
+    """(a, b, c) of mreal = a*nx + b*ny + c, where xi = x*cos(theta) + y*sin(theta)."""
     cc = np.cos(theta)
     ss = np.sin(theta)
-
     a = dx * cc / dxi
     b = dy * ss / dxi
     c = (x0 * cc + y0 * ss - xi0) / dxi
+    return a, b, c
 
-    nx = np.arange(1, Nx + 1)
-    ny = np.arange(1, Ny + 1)
 
-    mreal = a * nx[None, :] + b * ny[:, None] + c
-    m = _fix_array(mreal)
+@numba.njit(parallel=True, cache=True, error_model="numpy")
+def _WFBP3DVoxels(theta, cc, ss, a, b, c, zn, Spiral, StaticCT, z0focus, alpha0, zRot_2pi,
+                  RF, RD, A, Npi, xi0, dxi, M, Ns, ds, Sino,
+                  x0, dx, Nx, y0, dy, Ny, z0, dz, Nz, Reconstruction, HxyzVolume):
+    """Weighted filtered backprojection of the views theta[scan, n] into every voxel.
 
-    return mreal, m, mreal - m, (m >= 1) & (m < M), xi0 + mreal * dxi, cc, ss
+    Loops like the MATLAB original: per voxel the half-turn groups nthetaBar, and within a
+    group all scans and then the views n = nthetaBar, nthetaBar + Npi, ... Voxels that
+    miss a group are incomplete and end up 0. The focus height is zn[scan] for sequence
+    scans and follows the source angle for spirals; StaticCT selects the ring geometry.
+    """
+    S, N = theta.shape
+    RFsquare = RF * RF
+    M_Ns = M * Ns
+    M_Ns_N = M_Ns * N
+    RFsquarePlusRDSquare = RFsquare + RD * RD
+    TwoRDRF = 2 * RD * RF
+    RFbyRD = RF / RD
+    one_minus_RFbyRD_square = 1 - RFbyRD * RFbyRD
+    pi_half = np.pi / 2
+    for j in numba.prange(Nz * Ny):
+        z = z0 + (j // Ny + 1) * dz
+        z_RF = z * RF
+        ny = j % Ny + 1
+        y = y0 + ny * dy
+        for nx in range(1, Nx + 1):
+            x = x0 + nx * dx
+            total = 0.0
+            hits = 0.0
+            complete = True
+            for nthetaBar in range(Npi):
+                Hxyz = 0
+                Vxyz = 0.0
+                for scan in range(S):
+                    for n in range(nthetaBar, N, Npi):
+                        mreal = a[scan, n] * nx + b[scan, n] * ny + c[scan, n]
+                        # 1 <= fix(v) < M is the same as 1 <= v < M and also rejects NaN.
+                        if not 1 <= mreal < M:
+                            continue
+                        xi = xi0 + mreal * dxi
+                        y_cc = y * cc[scan, n]
+                        if StaticCT:
+                            beta_real = -np.arcsin(xi / RF)
+                            zs = zn[scan]
+                            if Spiral:
+                                alpha = theta[scan, n] - beta_real
+                                zs = z0focus + (alpha - alpha0) * zRot_2pi
+                            tan_beta_real_square = np.tan(beta_real) ** 2
+                            argument = ((-tan_beta_real_square * RFbyRD
+                                         + np.sqrt(tan_beta_real_square
+                                                   * one_minus_RFbyRD_square + 1))
+                                        / (tan_beta_real_square + 1))
+                            betaDash_real = np.sign(beta_real) * np.arccos(
+                                min(max(argument, -1.0), 1.0))
+                            L = np.sqrt(RFsquarePlusRDSquare
+                                        + TwoRDRF * np.sin(betaDash_real + pi_half))
+                            l = np.sqrt((RFsquare - xi * xi) - x * ss[scan, n] + y_cc)
+                            nsreal = (z - zs) * L / (l * ds) + A
+                        else:
+                            zs = zn[scan]
+                            if Spiral:
+                                alpha = theta[scan, n] + np.arcsin(xi / RF)
+                                zs = z0focus + (alpha - alpha0) * zRot_2pi
+                            nsreal = ((z_RF - zs * RF)
+                                      / ((np.sqrt(RFsquare - xi * xi) - x * ss[scan, n] + y_cc)
+                                         * ds) + A)
+                        if not 1 <= nsreal < Ns:
+                            continue
+                        m = int(mreal)
+                        ns = int(nsreal)
+                        wm = mreal - m
+                        wns = nsreal - ns
+                        k = scan * M_Ns_N + n * M_Ns + (ns - 1) * M + m - 1
+                        Reproj_ns = (1 - wm) * Sino[k] + wm * Sino[k + 1]
+                        Reproj_ns_plus1 = (1 - wm) * Sino[k + M] + wm * Sino[k + M + 1]
+                        Vxyz = Vxyz + (1 - wns) * Reproj_ns + wns * Reproj_ns_plus1
+                        Hxyz += 1
+                if Hxyz > 0:
+                    total += Vxyz / Hxyz
+                else:
+                    complete = False
+                hits += Hxyz
+            index = j * Nx + nx - 1
+            Reconstruction[index] = total if complete else 0.0
+            HxyzVolume[index] = hits
+
+
+def _WFBP3D(theta, zn, A, N2pi, dtheta, RF, xi0, dxi, M, Ns, ds, Sino,
+            x0, dx, Nx, y0, dy, Ny, z0, dz, Nz,
+            Spiral=False, z0focus=0.0, alpha0=0.0, zRot_2pi=0.0, StaticCT=False, RD=1.0):
+    """(Reconstruction, HxyzVolume) of the views theta with shape (scans, N)."""
+    theta = np.ascontiguousarray(theta, dtype=float)
+    a, b, c = _ParallelViewCoefficients(theta, x0, dx, y0, dy, xi0, dxi)
+
+    Reconstruction = np.zeros(Nx * Ny * Nz)
+    HxyzVolume = np.zeros(Nx * Ny * Nz)
+    _WFBP3DVoxels(theta, np.cos(theta), np.sin(theta), a, b, c,
+                  np.ascontiguousarray(zn, dtype=float), Spiral, StaticCT,
+                  float(z0focus), float(alpha0), float(zRot_2pi), float(RF), float(RD),
+                  float(A), int(N2pi // 2), float(xi0), float(dxi), int(M), int(Ns),
+                  float(ds), _Sinogram(Sino), float(x0), float(dx), int(Nx),
+                  float(y0), float(dy), int(Ny), float(z0), float(dz), int(Nz),
+                  Reconstruction, HxyzVolume)
+
+    return Reconstruction * dtheta, HxyzVolume
+
+
+def _EachStack(func, stacks, **shared):
+    """The MATLAB parfor over the z-stacks; the threaded kernel parallelizes each stack."""
+    return [func(**stack, **shared) for stack in stacks]
+
+
+def _Views(theta0, dtheta, N):
+    return theta0 + np.arange(1, N + 1) * dtheta
+
+
+def _Sinogram(Sino):
+    return np.ascontiguousarray(Sino, dtype=float).ravel()
 
 
 def _GatherSino3D(Sino, base, M, wm, wns, valid):
@@ -54,6 +206,21 @@ def _HalfTurnGroups(N, Npi):
     return [list(range(nthetaBar, N + 1, Npi)) for nthetaBar in range(1, Npi + 1)]
 
 
+def _PixDriven3DGroups(groups, Sino, block, theta0, dtheta, RF, xi0, dxi, M, Ns, ds,
+                       x0, dx, Nx, y0, dy, Ny, z0, dz, Nz):
+    """parfor body: sum of the half-turn averaged backprojections of some groups."""
+    Reconstruction = Allocation.zeros(Nx * Ny * Nz)
+    for group in groups:
+        Partial = Allocation.zeros(Nx * Ny * Nz)
+        for n in group:
+            Partial += Backprojection.PixDriven3DBackProjParCartesianSingle(
+                theta0 + n * dtheta, RF, xi0, dxi, M, Ns, ds,
+                Sino[(n - 1) * block:n * block], x0, dx, Nx, y0, dy, Ny, z0, dz, Nz
+            )
+        Reconstruction += Partial / len(group)
+    return Reconstruction
+
+
 class Backprojection:
     """Pixel-driven backprojectors.
 
@@ -63,52 +230,30 @@ class Backprojection:
 
     @staticmethod
     def PixDrivenBackProjParCartesianSingleBase(M, Nx, Ny, a, b, c, Proj):
-        Proj = np.asarray(Proj, dtype=float)
-
-        nx = np.arange(1, Nx + 1)
-        ny = np.arange(1, Ny + 1)
-        mreal = a * nx[None, :] + b * ny[:, None] + c
-        m = np.trunc(mreal).astype(np.int64)
-        w = mreal - m
-        valid = (m >= 1) & (m < M)
-
-        safe = np.where(valid, m, 1)
-        contribution = (1 - w) * Proj[safe - 1] + w * Proj[safe]
-
         Reprojection = Allocation.zeros(Nx * Ny)
-        Reprojection[:] = np.where(valid, contribution, 0.0).ravel()
+        _BackprojectParallelViews(np.array([a], dtype=float), np.array([b], dtype=float),
+                                  np.array([c], dtype=float), np.ones(1), _Sinogram(Proj),
+                                  int(M), int(Nx), int(Ny), Reprojection)
         return Reprojection
 
     @staticmethod
     def PixDrivenBackProjParCartesianSingle(theta, xi0, dxi, M, Proj, x0, dx, Nx, y0, dy, Ny):
-        # xi = x*cos(theta) + y*sin(theta)
-        cc = np.cos(theta)
-        ss = np.sin(theta)
-        a = dx * cc / dxi
-        b = dy * ss / dxi
-        c = (x0 * cc + y0 * ss - xi0) / dxi
+        a, b, c = _ParallelViewCoefficients(theta, x0, dx, y0, dy, xi0, dxi)
         return Backprojection.PixDrivenBackProjParCartesianSingleBase(M, Nx, Ny, a, b, c, Proj)
 
     @staticmethod
     def PixDrivenBackProjParCartesian(theta0, dtheta, N, N2pi, xi0, dxi, M, Sino, x0, dx, Nx, y0, dy, Ny):
-        Sino = np.asarray(Sino, dtype=float)
-
         # Rays a half turn apart are redundant, so each half-turn group shares one norm.
         # MATLAB buffers all N backprojections first; normalizing on the fly is equivalent
         # and avoids an (N, Nx*Ny) array.
         Npi = int(N2pi // 2)
         Norm = np.array([len(range(nbar, N + 1, Npi)) for nbar in range(1, Npi + 1)], dtype=float)
 
-        Reconstruction = Allocation.zeros(Nx * Ny)
-        for n in range(1, N + 1):
-            norm = Norm[(n - 1) % Npi]
-            if norm == 0:
-                continue
-            Projection = Sino[(n - 1) * M:n * M]
-            Reconstruction += Backprojection.PixDrivenBackProjParCartesianSingle(
-                theta0 + n * dtheta, xi0, dxi, M, Projection, x0, dx, Nx, y0, dy, Ny
-            ) / norm
+        a, b, c = _ParallelViewCoefficients(_Views(theta0, dtheta, N), x0, dx, y0, dy, xi0, dxi)
 
+        Reconstruction = Allocation.zeros(Nx * Ny)
+        _BackprojectParallelViews(a, b, c, Norm[np.arange(N) % Npi], _Sinogram(Sino),
+                                  int(M), int(Nx), int(Ny), Reconstruction)
         return Reconstruction * dtheta
 
     @staticmethod
@@ -118,41 +263,11 @@ class Backprojection:
         Unlike PixDrivenBackProjParCartesian the weighting is per voxel: each voxel counts
         only the projections that actually hit the detector, so truncated views do not bias it.
         """
-        Sino = np.asarray(Sino, dtype=float)
-        Npi = int(N2pi // 2)
-
-        nx = np.arange(1, Nx + 1)
-        ny = np.arange(1, Ny + 1)
+        a, b, c = _ParallelViewCoefficients(_Views(theta0, dtheta, N), x0, dx, y0, dy, xi0, dxi)
 
         Reconstruction = Allocation.zeros(Nx * Ny)
-
-        for nthetaBar in range(1, Npi + 1):
-            Vxy = np.zeros((Ny, Nx))
-            Hxy = np.zeros((Ny, Nx))
-
-            for n in range(nthetaBar, N + 1, Npi):
-                theta = theta0 + n * dtheta
-                cc = np.cos(theta)
-                ss = np.sin(theta)
-                a = dx * cc / dxi
-                b = dy * ss / dxi
-                c = (x0 * cc + y0 * ss - xi0) / dxi
-
-                mreal = a * nx[None, :] + b * ny[:, None] + c
-                m = np.trunc(mreal).astype(np.int64)
-                w = mreal - m
-                valid = (m >= 1) & (m < M)
-
-                safe = np.where(valid, m, 1)
-                Projection = Sino[(n - 1) * M:n * M]
-                contribution = (1 - w) * Projection[safe - 1] + w * Projection[safe]
-
-                Vxy += np.where(valid, contribution, 0.0)
-                Hxy += valid
-
-            np.divide(Vxy, Hxy, out=Vxy, where=Hxy > 0)
-            Reconstruction += np.where(Hxy > 0, Vxy, 0.0).ravel()
-
+        _WFBP2DViews(a, b, c, int(N2pi // 2), _Sinogram(Sino), int(M), int(Nx), int(Ny),
+                     Reconstruction)
         return Reconstruction * dtheta
 
     # ------------------------------------------------------- 3D parallel beam
@@ -222,277 +337,77 @@ class Backprojection:
         cos_gamma = np.cos(np.abs(np.arctan((s0 + ns * ds) / RF)))
         Sino = (Sino.reshape(N, Ns, M) * cos_gamma[None, :, None]).ravel()
 
-        # 2. Backproject each view, 3. average over the redundant half turns.
+        # 2. Backproject each view, 3. average over the redundant half turns. Each worker
+        # sums the groups of its chunk; without a pool there is one chunk, i.e. serial order.
         Npi = int(N2pi // 2)
-        block = M * Ns
+
+        Partials = Parallelization.ParFor(
+            _PixDriven3DGroups,
+            [{"groups": chunk} for chunk in Parallelization.Chunks(_HalfTurnGroups(N, Npi))],
+            Sino=Sino, block=M * Ns, theta0=theta0, dtheta=dtheta, RF=RF, xi0=xi0, dxi=dxi,
+            M=M, Ns=Ns, ds=ds, x0=x0, dx=dx, Nx=Nx, y0=y0, dy=dy, Ny=Ny, z0=z0, dz=dz, Nz=Nz
+        )
 
         Reconstruction = Allocation.zeros(Nx * Ny * Nz)
-        for group in _HalfTurnGroups(N, Npi):
-            Partial = Allocation.zeros(Nx * Ny * Nz)
-            for n in group:
-                Partial += Backprojection.PixDriven3DBackProjParCartesianSingle(
-                    theta0 + n * dtheta, RF, xi0, dxi, M, Ns, ds,
-                    Sino[(n - 1) * block:n * block], x0, dx, Nx, y0, dy, Ny, z0, dz, Nz
-                )
-            Reconstruction += Partial / len(group)
+        for Partial in Partials:
+            Reconstruction += Partial
 
         return Reconstruction * dtheta
 
     # ------------------------------------------------------------- 3D WFBP
 
     @staticmethod
-    def _WFBP3D(N, N2pi, Nx, Ny, Nz, Sample):
-        """Shared half-turn averaging of the weighted filtered backprojection.
-
-        `Sample(n)` returns (contribution, valid) for projection n over the whole volume.
-        Voxels that never see a contribution for some half-turn group are incomplete and
-        are zeroed at the end, exactly like the MATLAB DataCompletenessVolume.
-        """
-        shape = (Nz, Ny, Nx)
-        Npi = int(N2pi // 2)
-
-        Reconstruction = np.zeros(shape)
-        HxyzVolume = np.zeros(shape)
-        Complete = np.ones(shape, dtype=bool)
-
-        for group in _HalfTurnGroups(N, Npi):
-            Vxyz = np.zeros(shape)
-            Hxyz = np.zeros(shape, dtype=np.int64)
-
-            for n in group:
-                contribution, valid = Sample(n)
-                Vxyz += contribution
-                Hxyz += valid
-
-            hit = Hxyz > 0
-            Reconstruction[hit] += Vxyz[hit] / Hxyz[hit]
-            Complete &= hit
-            HxyzVolume += Hxyz
-
-        Reconstruction[~Complete] = 0.0
-
-        return Reconstruction.ravel(), HxyzVolume.ravel()
-
-    @staticmethod
     def SpiralWFBP3DFullyPixelDriven(RF, theta0, dtheta, N, N2pi, xi0, dxi, M, s0, ds, Ns,
                                      Sino, x0, dx, Nx, y0, dy, Ny, z0, dz, Nz,
                                      z0focus, pitch, alpha0):
-        Sino = np.asarray(Sino, dtype=float).ravel()
+        theta = theta0 + np.arange(1, N + 1)[None, :] * dtheta
 
-        A = Ns / 2.0 + 0.5
-        RFsquare = RF * RF
-        M_Ns = M * Ns
-        zRot_2pi = pitch * Ns * ds / (2 * np.pi)
-
-        x = x0 + np.arange(1, Nx + 1) * dx
-        y = y0 + np.arange(1, Ny + 1) * dy
-        z = z0 + np.arange(1, Nz + 1) * dz
-
-        def Sample(n):
-            theta = theta0 + n * dtheta
-            mreal, m, wm, valid_m, xi, cc, ss = _InPlaneRay(
-                theta, x0, dx, Nx, y0, dy, Ny, xi0, dxi, M
-            )
-
-            # The focus height follows the source angle alpha, not the parallel angle theta.
-            alpha = theta + np.arcsin(np.clip(xi / RF, -1.0, 1.0))
-            zn = z0focus + (alpha - alpha0) * zRot_2pi
-
-            denom = (np.sqrt(np.clip(RFsquare - xi * xi, 0.0, None))
-                     - x[None, :] * ss + (y * cc)[:, None]) * ds
-
-            with np.errstate(divide="ignore", invalid="ignore"):
-                nsreal = ((z[:, None, None] - zn[None, :, :]) * RF) / denom[None, :, :] + A
-
-            nsreal = np.nan_to_num(nsreal, nan=-1.0, posinf=-1.0, neginf=-1.0)
-            ns = _fix_array(nsreal)
-
-            valid = valid_m[None, :, :] & (ns >= 1) & (ns < Ns)
-            base = (n - 1) * M_Ns + (ns - 1) * M + np.broadcast_to(m, ns.shape) - 1
-
-            contribution = _GatherSino3D(
-                Sino, base, M, np.broadcast_to(wm, ns.shape), nsreal - ns, valid
-            )
-            return contribution, valid
-
-        Reconstruction, HxyzVolume = Backprojection._WFBP3D(N, N2pi, Nx, Ny, Nz, Sample)
-        return Reconstruction * dtheta, HxyzVolume
+        # The focus height follows the source angle alpha, not the parallel angle theta.
+        return _WFBP3D(theta, [0.0], Ns / 2.0 + 0.5, N2pi, dtheta, RF, xi0, dxi, M, Ns, ds,
+                       Sino, x0, dx, Nx, y0, dy, Ny, z0, dz, Nz, Spiral=True,
+                       z0focus=z0focus, alpha0=alpha0, zRot_2pi=pitch * Ns * ds / (2 * np.pi))
 
     @staticmethod
     def SequenceWFBP3DFullyPixelDriven(RF, theta0, dtheta, N, N2pi, xi0, dxi, M, s0, ds, Ns,
                                        Sino, x0, dx, Nx, y0, dy, Ny, z0, dz, Nz,
                                        z0focus, dzfocus, NzScans):
-        Sino = np.asarray(Sino, dtype=float).ravel()
         theta0 = np.atleast_1d(np.asarray(theta0, dtype=float))
-        NzScans = np.atleast_1d(np.asarray(NzScans))
+        ScanIdx = np.atleast_1d(np.asarray(NzScans, dtype=np.int64))
 
-        A = Ns / 2.0 + 0.5
-        RFsquare = RF * RF
-        M_Ns = M * Ns
-        M_Ns_N = M * Ns * N
+        # Every sequence scan position contributes to the same half-turn group.
+        theta = theta0[ScanIdx - 1][:, None] + np.arange(1, N + 1)[None, :] * dtheta
+        zn = z0focus + np.arange(ScanIdx.size) * dzfocus
 
-        x = x0 + np.arange(1, Nx + 1) * dx
-        y = y0 + np.arange(1, Ny + 1) * dy
-        z = z0 + np.arange(1, Nz + 1) * dz
-
-        def Sample(n):
-            contribution = np.zeros((Nz, Ny, Nx))
-            valid_total = np.zeros((Nz, Ny, Nx), dtype=np.int64)
-
-            # Every sequence scan position contributes to the same half-turn group.
-            for nzScan in range(1, len(NzScans) + 1):
-                ScanIdx = int(NzScans[nzScan - 1])
-                zn = z0focus + (nzScan - 1) * dzfocus
-
-                theta = theta0[ScanIdx - 1] + n * dtheta
-                mreal, m, wm, valid_m, xi, cc, ss = _InPlaneRay(
-                    theta, x0, dx, Nx, y0, dy, Ny, xi0, dxi, M
-                )
-
-                denom = (np.sqrt(np.clip(RFsquare - xi * xi, 0.0, None))
-                         - x[None, :] * ss + (y * cc)[:, None]) * ds
-
-                with np.errstate(divide="ignore", invalid="ignore"):
-                    nsreal = ((z[:, None, None] - zn) * RF) / denom[None, :, :] + A
-
-                nsreal = np.nan_to_num(nsreal, nan=-1.0, posinf=-1.0, neginf=-1.0)
-                ns = _fix_array(nsreal)
-
-                valid = valid_m[None, :, :] & (ns >= 1) & (ns < Ns)
-                base = ((nzScan - 1) * M_Ns_N + (n - 1) * M_Ns + (ns - 1) * M
-                        + np.broadcast_to(m, ns.shape) - 1)
-
-                contribution += _GatherSino3D(
-                    Sino, base, M, np.broadcast_to(wm, ns.shape), nsreal - ns, valid
-                )
-                valid_total += valid
-
-            return contribution, valid_total
-
-        Reconstruction, HxyzVolume = Backprojection._WFBP3D(N, N2pi, Nx, Ny, Nz, Sample)
-        return Reconstruction * dtheta, HxyzVolume
+        return _WFBP3D(theta, zn, Ns / 2.0 + 0.5, N2pi, dtheta, RF, xi0, dxi, M, Ns, ds,
+                       Sino, x0, dx, Nx, y0, dy, Ny, z0, dz, Nz)
 
     # --------------------------------------------------------- 3D WFBP static CT
-
-    @staticmethod
-    def _StaticCTRowCoordinate(RF, RD, xi, x, y, ss, cc, z, zn, ds, A):
-        """Detector row coordinate of the static CT geometry.
-
-        The source-to-element distance L depends on betaDash, which follows from the
-        parallel coordinate xi. MATLAB wraps the whole bracket of `l` in the square root,
-        unlike the fan variant, and that form is kept verbatim here.
-        """
-        RFsquare = RF * RF
-        RFbyRD = RF / RD
-
-        beta_real = -np.arcsin(np.clip(xi / RF, -1.0, 1.0))
-
-        tan_beta_real_square = np.tan(beta_real) ** 2
-        # Rays beyond the detector ring make the radicand negative; MATLAB continues with a
-        # complex value there, the port lets the NaN mark the sample as invalid.
-        with np.errstate(invalid="ignore"):
-            argument = ((-tan_beta_real_square * RFbyRD
-                         + np.sqrt(tan_beta_real_square * (1 - RFbyRD * RFbyRD) + 1))
-                        / (tan_beta_real_square + 1))
-        betaDash_real = np.sign(beta_real) * np.arccos(np.clip(argument, -1.0, 1.0))
-
-        L = np.sqrt(RFsquare + RD * RD + 2 * RD * RF * np.sin(betaDash_real + np.pi / 2))
-        l = np.sqrt(np.clip((RFsquare - xi * xi) - x[None, :] * ss + (y * cc)[:, None],
-                            0.0, None))
-
-        with np.errstate(divide="ignore", invalid="ignore"):
-            nsreal = (z[:, None, None] - zn) * L[None, :, :] / (l[None, :, :] * ds) + A
-
-        return np.nan_to_num(nsreal, nan=-1.0, posinf=-1.0, neginf=-1.0), beta_real
 
     @staticmethod
     def SequenceWFBP3DFullyPixelDriven_StaticCT(RF, RD, theta0, dtheta, N, N2pi, xi0, dxi,
                                                 Mpar, s0, ds, Ns, soffset, Sino,
                                                 x0, dx, Nx, y0, dy, Ny, z0, dz, Nz,
                                                 z0focus, dzfocus, NzScans):
-        Sino = np.asarray(Sino, dtype=float).ravel()
-        NzScans = np.atleast_1d(np.asarray(NzScans))
+        NzScans = len(np.atleast_1d(np.asarray(NzScans)))
+        theta = np.broadcast_to(theta0 + np.arange(1, N + 1) * dtheta, (NzScans, N))
+        zn = z0focus + np.arange(NzScans) * dzfocus
 
         # The static CT detector is shifted by soffset instead of being centred on zero.
-        A = -soffset / ds + Ns + 0.5
-        M_Ns = Mpar * Ns
-        M_Ns_N = Mpar * Ns * N
-
-        x = x0 + np.arange(1, Nx + 1) * dx
-        y = y0 + np.arange(1, Ny + 1) * dy
-        z = z0 + np.arange(1, Nz + 1) * dz
-
-        def Sample(n):
-            contribution = np.zeros((Nz, Ny, Nx))
-            valid_total = np.zeros((Nz, Ny, Nx), dtype=np.int64)
-
-            theta = theta0 + n * dtheta
-            mreal, m, wm, valid_m, xi, cc, ss = _InPlaneRay(
-                theta, x0, dx, Nx, y0, dy, Ny, xi0, dxi, Mpar
-            )
-
-            for nzScan in range(1, len(NzScans) + 1):
-                zn = z0focus + (nzScan - 1) * dzfocus
-
-                nsreal, _ = Backprojection._StaticCTRowCoordinate(
-                    RF, RD, xi, x, y, ss, cc, z, zn, ds, A
-                )
-                ns = _fix_array(nsreal)
-
-                valid = valid_m[None, :, :] & (ns >= 1) & (ns < Ns)
-                base = ((nzScan - 1) * M_Ns_N + (n - 1) * M_Ns + (ns - 1) * Mpar
-                        + np.broadcast_to(m, ns.shape) - 1)
-
-                contribution += _GatherSino3D(
-                    Sino, base, Mpar, np.broadcast_to(wm, ns.shape), nsreal - ns, valid
-                )
-                valid_total += valid
-
-            return contribution, valid_total
-
-        Reconstruction, HxyzVolume = Backprojection._WFBP3D(N, N2pi, Nx, Ny, Nz, Sample)
-        return Reconstruction * dtheta, HxyzVolume
+        return _WFBP3D(theta, zn, -soffset / ds + Ns + 0.5, N2pi, dtheta, RF, xi0, dxi, Mpar,
+                       Ns, ds, Sino, x0, dx, Nx, y0, dy, Ny, z0, dz, Nz, StaticCT=True, RD=RD)
 
     @staticmethod
     def SpiralWFBP3DFullyPixelDriven_StaticCT(RF, RD, theta0, dtheta, N, N2pi, xi0, dxi,
                                               Mpar, s0, ds, Ns, soffset, Sino,
                                               x0, dx, Nx, y0, dy, Ny, z0, dz, Nz,
                                               z0focus, pitch, alpha0):
-        Sino = np.asarray(Sino, dtype=float).ravel()
+        theta = theta0 + np.arange(1, N + 1)[None, :] * dtheta
 
-        A = -soffset / ds + Ns + 0.5
-        M_Ns = Mpar * Ns
-        zRot_2pi = pitch * Ns * ds / (2 * np.pi)
-
-        x = x0 + np.arange(1, Nx + 1) * dx
-        y = y0 + np.arange(1, Ny + 1) * dy
-        z = z0 + np.arange(1, Nz + 1) * dz
-
-        def Sample(n):
-            theta = theta0 + n * dtheta
-            mreal, m, wm, valid_m, xi, cc, ss = _InPlaneRay(
-                theta, x0, dx, Nx, y0, dy, Ny, xi0, dxi, Mpar
-            )
-
-            beta_real = -np.arcsin(np.clip(xi / RF, -1.0, 1.0))
-            alpha = theta - beta_real
-            zn = z0focus + (alpha - alpha0) * zRot_2pi
-
-            nsreal, _ = Backprojection._StaticCTRowCoordinate(
-                RF, RD, xi, x, y, ss, cc, z, zn[None, :, :], ds, A
-            )
-            ns = _fix_array(nsreal)
-
-            valid = valid_m[None, :, :] & (ns >= 1) & (ns < Ns)
-            base = (n - 1) * M_Ns + (ns - 1) * Mpar + np.broadcast_to(m, ns.shape) - 1
-
-            contribution = _GatherSino3D(
-                Sino, base, Mpar, np.broadcast_to(wm, ns.shape), nsreal - ns, valid
-            )
-            return contribution, valid
-
-        Reconstruction, HxyzVolume = Backprojection._WFBP3D(N, N2pi, Nx, Ny, Nz, Sample)
-        return Reconstruction * dtheta, HxyzVolume
+        # MATLAB marks zRot_2pi as still to be adapted to the static CT geometry.
+        return _WFBP3D(theta, [0.0], -soffset / ds + Ns + 0.5, N2pi, dtheta, RF, xi0, dxi,
+                       Mpar, Ns, ds, Sino, x0, dx, Nx, y0, dy, Ny, z0, dz, Nz, Spiral=True,
+                       z0focus=z0focus, alpha0=alpha0, zRot_2pi=pitch * Ns * ds / (2 * np.pi),
+                       StaticCT=True, RD=RD)
 
     # ------------------------------------------------- stacked / parallel wrappers
 
@@ -572,14 +487,21 @@ class Backprojection:
         VolumeStacks = [None] * TotalItems
         HxyzStacks = [None] * TotalItems
 
-        # MATLAB uses parfor here; the port runs the stacks serially.
-        for i in range(TotalItems):
-            if FirstReadingStack[i] < N and FinalReadingStack[i] > 1:
-                VolumeStacks[i], HxyzStacks[i] = Backprojection.SpiralWFBP3DFullyPixelDriven(
-                    RF, thetaStacks[i], dtheta, int(NStacks[i]), N2pi, xi0, dxi, M, s0, ds, Ns,
-                    SinoStacks[i], x0, dx, Nx, y0, dy, Ny, z0Stack[i], dz, int(StackSizes[i]),
-                    z0focus, pitch, alpha0
-                )
+        Items = [i for i in range(TotalItems)
+                 if FirstReadingStack[i] < N and FinalReadingStack[i] > 1]
+
+        Results = _EachStack(
+            Backprojection.SpiralWFBP3DFullyPixelDriven,
+            [{"theta0": thetaStacks[i], "N": int(NStacks[i]), "Sino": SinoStacks[i],
+              "z0": z0Stack[i], "Nz": int(StackSizes[i])} for i in Items],
+            RF=RF, dtheta=dtheta, N2pi=N2pi, xi0=xi0, dxi=dxi, M=M, s0=s0, ds=ds, Ns=Ns,
+            x0=x0, dx=dx, Nx=Nx, y0=y0, dy=dy, Ny=Ny, dz=dz,
+            z0focus=z0focus, pitch=pitch, alpha0=alpha0
+        )
+
+        for i, (Volume, Hxyz) in zip(Items, Results):
+            VolumeStacks[i] = Volume
+            HxyzStacks[i] = Hxyz
 
         return Backprojection._MergeStacks(VolumeStacks, HxyzStacks, StackSizes, Nx, Ny)
 
@@ -641,19 +563,24 @@ class Backprojection:
         VolumeStacks = [None] * TotalItems
         HxyzStacks = [None] * TotalItems
 
-        for i in range(TotalItems):
-            selectedScans = Scans[i]
+        Items = [i for i in range(TotalItems) if Scans[i] is not None and len(Scans[i]) > 0]
 
-            if selectedScans is not None and len(selectedScans) > 0:
-                VolumeStacks[i], HxyzStacks[i] = Backprojection.SequenceWFBP3DFullyPixelDriven(
-                    RF, theta0, dtheta, N, N2pi, xi0, dxi, M, s0, ds, Ns, SinoStacks[i],
-                    x0, dx, Nx, y0, dy, Ny, z0stack[i], dz, int(StackSizes[i]),
-                    z0focousStacks[i], dzfocus, selectedScans
-                )
-            else:
-                empty = Allocation.zeros(Nx * Ny * int(StackSizes[i]))
-                VolumeStacks[i] = empty
-                HxyzStacks[i] = empty
+        Results = _EachStack(
+            Backprojection.SequenceWFBP3DFullyPixelDriven,
+            [{"Sino": SinoStacks[i], "z0": z0stack[i], "Nz": int(StackSizes[i]),
+              "z0focus": z0focousStacks[i], "NzScans": Scans[i]} for i in Items],
+            RF=RF, theta0=theta0, dtheta=dtheta, N=N, N2pi=N2pi, xi0=xi0, dxi=dxi, M=M,
+            s0=s0, ds=ds, Ns=Ns, x0=x0, dx=dx, Nx=Nx, y0=y0, dy=dy, Ny=Ny, dz=dz,
+            dzfocus=dzfocus
+        )
+
+        for i in range(TotalItems):
+            if i not in Items:
+                VolumeStacks[i] = HxyzStacks[i] = Allocation.zeros(Nx * Ny * int(StackSizes[i]))
+
+        for i, (Volume, Hxyz) in zip(Items, Results):
+            VolumeStacks[i] = Volume
+            HxyzStacks[i] = Hxyz
 
         return Backprojection._MergeStacks(VolumeStacks, HxyzStacks, StackSizes, Nx, Ny)
 
@@ -792,21 +719,28 @@ class Backprojection:
                     selected.append(nzScans)
             return selected
 
+        Stacks = []
         for i in range(1, NrzStacks + 1):
             z0stack = z0 + (i - 1) * zStacksize * dz
             selected = SelectScans(z0stack + dz, z0stack + zStacksize * dz)
 
-            if not selected:
-                continue
+            if selected:
+                Stacks.append((i, {
+                    "Sino": Sino[(selected[0] - 1) * block:selected[-1] * block],
+                    "z0": z0stack,
+                    "z0focus": z0focus + (selected[0] - 1) * dzfocus,
+                    "NzScans": range(1, len(selected) + 1),
+                }))
 
-            SinoContributing = Sino[(selected[0] - 1) * block:selected[-1] * block]
+        Results = _EachStack(
+            Backprojection.SequenceWFBP3DFullyPixelDriven_StaticCT,
+            [sliced for _, sliced in Stacks],
+            RF=RF, RD=RD, theta0=theta0, dtheta=dtheta, N=N, N2pi=N2pi, xi0=xi0, dxi=dxi,
+            Mpar=Mpar, s0=s0, ds=ds, Ns=Ns, soffset=soffset,
+            x0=x0, dx=dx, Nx=Nx, y0=y0, dy=dy, Ny=Ny, dz=dz, Nz=zStacksize, dzfocus=dzfocus
+        )
 
-            Volume, Hxyz = Backprojection.SequenceWFBP3DFullyPixelDriven_StaticCT(
-                RF, RD, theta0, dtheta, N, N2pi, xi0, dxi, Mpar, s0, ds, Ns, soffset,
-                SinoContributing, x0, dx, Nx, y0, dy, Ny, z0stack, dz, zStacksize,
-                z0focus + (selected[0] - 1) * dzfocus, dzfocus, range(1, len(selected) + 1)
-            )
-
+        for (i, _), (Volume, Hxyz) in zip(Stacks, Results):
             start = (i - 1) * slab * zStacksize
             Reconstruction[start:start + slab * zStacksize] = Volume
             HxyzVolume[start:start + slab * zStacksize] = Hxyz
@@ -901,22 +835,29 @@ class Backprojection:
 
             return max(readingstart, 1), min(readingend, N)
 
+        Stacks = []
         for i in range(1, NrzStacks + 1):
             z0stack = z0 + (i - 1) * zStacksize * dz
             readings = SelectReadings(z0stack + dz, z0stack + zStacksize * dz)
 
-            if readings is None:
-                continue
+            if readings is not None:
+                readingstart, readingend = readings
+                Stacks.append((i, {
+                    "theta0": theta0 + (readingstart - 1) * dtheta,
+                    "N": readingend - readingstart + 1,
+                    "Sino": Sino[(readingstart - 1) * block:readingend * block],
+                    "z0": z0stack,
+                }))
 
-            readingstart, readingend = readings
+        Results = _EachStack(
+            Backprojection.SpiralWFBP3DFullyPixelDriven_StaticCT,
+            [sliced for _, sliced in Stacks],
+            RF=RF, RD=RD, dtheta=dtheta, N2pi=N2pi, xi0=xi0, dxi=dxi, Mpar=Mpar,
+            s0=s0, ds=ds, Ns=Ns, soffset=soffset, x0=x0, dx=dx, Nx=Nx, y0=y0, dy=dy, Ny=Ny,
+            dz=dz, Nz=zStacksize, z0focus=z0focus, pitch=pitch, alpha0=alpha0
+        )
 
-            Volume, Hxyz = Backprojection.SpiralWFBP3DFullyPixelDriven_StaticCT(
-                RF, RD, theta0 + (readingstart - 1) * dtheta, dtheta,
-                readingend - readingstart + 1, N2pi, xi0, dxi, Mpar, s0, ds, Ns, soffset,
-                Sino[(readingstart - 1) * block:readingend * block],
-                x0, dx, Nx, y0, dy, Ny, z0stack, dz, zStacksize, z0focus, pitch, alpha0
-            )
-
+        for (i, _), (Volume, Hxyz) in zip(Stacks, Results):
             start = (i - 1) * slab * zStacksize
             Reconstruction[start:start + slab * zStacksize] = Volume
             HxyzVolume[start:start + slab * zStacksize] = Hxyz

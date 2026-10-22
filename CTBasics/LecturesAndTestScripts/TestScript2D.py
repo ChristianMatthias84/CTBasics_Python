@@ -7,25 +7,25 @@ phantom is the default here.
 """
 import numpy as np
 
-from ..ImageManipulation.ImageManipulation import ImageManipulation
-from ..Preprocessing.WBHC import WBHC
-from ..ReadAndWrite.IOHelperFunctions import IOHelperFunctions
-from ..Reconstruction.Backprojection import Backprojection
-from ..Reconstruction.Constants import Constants
-from ..Reconstruction.Convolution import Convolution
-from ..Reconstruction.ForwardProjection import ForwardProjection
-from ..Reconstruction.Kernels import Kernels
-from ..Reconstruction.MoireFilter import MoireFilter
-from ..Reconstruction.Rebinning import Rebinning
-from ..Simulation.CreatePhantom import CreatePhantom
-from ..Simulation.Noise import Noise
-from ..Simulation.Spectra import Spectra
-from .CTRecon101 import _Save
+from CTBasics.ImageManipulation.ImageManipulation import ImageManipulation
+from CTBasics.Preprocessing.WBHC import WBHC
+from CTBasics.ReadAndWrite.IOHelperFunctions import IOHelperFunctions
+from CTBasics.Reconstruction.Backprojection import Backprojection
+from CTBasics.Reconstruction.Constants import Constants
+from CTBasics.Reconstruction.Convolution import Convolution
+from CTBasics.Reconstruction.ForwardProjection import ForwardProjection
+from CTBasics.Reconstruction.Kernels import Kernels
+from CTBasics.Reconstruction.MoireFilter import MoireFilter
+from CTBasics.Reconstruction.Rebinning import Rebinning
+from CTBasics.Simulation.CreatePhantom import CreatePhantom
+from CTBasics.Simulation.Noise import Noise
+from CTBasics.Simulation.Spectra import Spectra
+from CTBasics.LecturesAndTestScripts.CTRecon101 import _Save
 
 
 def main(Outputdirectory=None, ShowFigures=False, Reconkernel=Kernels.RamLak,
          FFTConvolution=False, KerneldefinitionInFD=False, SimNoise=False,
-         ApplyMoireFilter=False, PatientData=False, WBHCCorrection=False,
+         ApplyMoireFilter=False, PatientData=True, WBHCCorrection=False,
          N_I0=1000000, DataDirectory=None,
          SelectedPhantom="SpectralHipWithMetal",
          spectrum=Spectra.kV120, E0=20, deltaE=10, N_Ebins=12,
@@ -86,7 +86,8 @@ def main(Outputdirectory=None, ShowFigures=False, Reconkernel=Kernels.RamLak,
             str(Path(DataDirectory) / "MAR2D" / "hip2.ima")
         )
         V_HU = ImageManipulation.Resample2D(np.asarray(V_HU, dtype=float), Nxsim, Nysim)
-        Voxelphantom = V_HU.T.ravel()
+        # MATLAB `X = V'; X(:)'` is the row-major flattening of V.
+        Voxelphantom = V_HU.ravel()
         # HU back to attenuation.
         Voxelphantom = (Voxelphantom + 1000) * Constants.MuW / 1000
 
@@ -158,7 +159,7 @@ def main(Outputdirectory=None, ShowFigures=False, Reconkernel=Kernels.RamLak,
         NFFT = 2 * M
 
         if KerneldefinitionInFD:
-            from ..Memory.Allocation import Allocation
+            from CTBasics.Memory.Allocation import Allocation
 
             RamlakKernelFD = Kernels.RamLakKernelFD(NFFT, dxi, Allocation.ones(NFFT))
             RamlakKernelSD = np.fft.ifft(RamlakKernelFD)
@@ -203,7 +204,7 @@ def main(Outputdirectory=None, ShowFigures=False, Reconkernel=Kernels.RamLak,
         _Save(Outputdirectory, "ReconstructionHU", ReconstructedImageHU)
 
     if ShowFigures:
-        from .CTRecon102 import _ShowFigures
+        from CTBasics.LecturesAndTestScripts.CTRecon102 import _ShowFigures
 
         _ShowFigures(Voxelphantom, Nxsim, Nysim, FanProjections, MFan, NFan,
                      RebinnedProjections, FilteredProjections, M, Npar,

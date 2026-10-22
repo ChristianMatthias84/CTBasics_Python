@@ -2,10 +2,10 @@ import math
 
 import numpy as np
 
-from ..ScannerGeometryTypes import ScannerGeometryTypes
-from ..Sampling.AzimuthalSampling import AzimuthalSampling
-from ..Sampling.FlyingFocalSpot import FlyingFocalSpot
-from .BaseScannerGeometry import BaseScannerGeometry
+from CTBasics.Descriptors.ScannerGeometryTypes import ScannerGeometryTypes
+from CTBasics.Descriptors.Sampling.AzimuthalSampling import AzimuthalSampling
+from CTBasics.Descriptors.Sampling.FlyingFocalSpot import FlyingFocalSpot
+from CTBasics.Descriptors.Geometries.BaseScannerGeometry import BaseScannerGeometry
 
 
 class FanBeam(BaseScannerGeometry):
@@ -47,8 +47,8 @@ class FanBeam(BaseScannerGeometry):
 
     def Load(self, DataDescriptor_in):
         """Fills the geometry from the descriptors of a measured raw-data file."""
-        from ...RawData.RawDataScanDescriptor import RawDataScanDescriptor
-        from ...RawData.ReadRawDataFunctions import ReadRawDataFunctions
+        from CTBasics.RawData.RawDataScanDescriptor import RawDataScanDescriptor
+        from CTBasics.RawData.ReadRawDataFunctions import ReadRawDataFunctions
 
         Scans = len(DataDescriptor_in) if isinstance(DataDescriptor_in, (list, tuple)) else 1
         DataDescriptor = DataDescriptor_in[0] if Scans > 1 else DataDescriptor_in

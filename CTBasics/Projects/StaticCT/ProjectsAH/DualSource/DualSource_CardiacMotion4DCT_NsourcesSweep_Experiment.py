@@ -12,18 +12,16 @@ from pathlib import Path
 
 import numpy as np
 
-from .....MultiCore.Parallelization import Parallelization
-from .....ReadAndWrite.IOHelperFunctions import IOHelperFunctions
-from .....Reconstruction.Backprojection import Backprojection
-from .....Reconstruction.Convolution import Convolution
-from .....Reconstruction.ForwardProjection import ForwardProjection
-from .....Reconstruction.Kernels import Kernels
-from .....Reconstruction.MoireFilter import MoireFilter
-from .....Simulation.Noise import Noise
-from .DualSource_CardiacMotion4DCT_Main import corr2, rmse
-from .Shared.DualSource_appendReconstructionMetrics import DualSource_appendReconstructionMetrics
-from .Shared.DualSource_buildOutputNaming import DualSource_buildOutputNaming
-from .Shared.DualSource_writeSimulationParameters import DualSource_writeSimulationParameters
+from CTBasics.MultiCore.Parallelization import Parallelization
+from CTBasics.ReadAndWrite.IOHelperFunctions import IOHelperFunctions
+from CTBasics.Reconstruction.Backprojection import Backprojection
+from CTBasics.Reconstruction.Convolution import Convolution
+from CTBasics.Reconstruction.ForwardProjection import ForwardProjection
+from CTBasics.Reconstruction.Kernels import Kernels
+from CTBasics.Reconstruction.MoireFilter import MoireFilter
+from CTBasics.Simulation.Noise import Noise
+from CTBasics.Projects.StaticCT.ProjectsAH.DualSource.DualSource_CardiacMotion4DCT_Main import corr2, rmse
+from CTBasics.Projects.StaticCT.StaticCTHelperFunctions import StaticCTIOHelpers, StaticCTVisualizationAndEvaluationHelpers
 
 SummaryVarNames = [
     "Nsources",
@@ -69,7 +67,7 @@ def main(OutputRoot=None, ShowFigures=False, Reconkernel=Kernels.RamLak,
     THeartCycle = 60 / Heartrate
     Shift_GT_Rest = THeartCycle - TRest / 2
 
-    naming = DualSource_buildOutputNaming(SelectedPhantom, Plaque, CM, Stent)
+    naming = StaticCTIOHelpers.DualSource_buildOutputNaming(SelectedPhantom, Plaque, CM, Stent)
     OutputRoot = Path(OutputRoot) / naming["RootFolderLabel"] / \
         f"NsourcesSweepNoise_Ph_{naming['PhantomCode']}"
 
@@ -160,12 +158,13 @@ def main(OutputRoot=None, ShowFigures=False, Reconkernel=Kernels.RamLak,
     projEnd = min(np.shape(points_single)[1], math.ceil((Npi * M) / M))
     midProj = round((projStart + projEnd) / 2)
 
-    cx = max(1, min(Nx, round((points_single[0, midProj - 1] - x0) / dx)))
-    cy = max(1, min(Ny, round((points_single[1, midProj - 1] - y0) / dy)))
+    cx_phys = points_single[0, midProj - 1]
+    cy_phys = points_single[1, midProj - 1]
+    cx = max(1, min(Nx, round((cx_phys - x0) / dx)))
+    cy = max(1, min(Ny, round((cy_phys - y0) / dy)))
 
-    r = 80
-    X, Y = np.meshgrid(np.arange(1, Nx + 1), np.arange(1, Ny + 1))
-    roiMask = ((X - cx) ** 2 + (Y - cy) ** 2) <= r ** 2
+    roiMask, _, _ = StaticCTVisualizationAndEvaluationHelpers.DualSource_buildPhantomRoiMask(
+        SelectedPhantom, [cx_phys, cy_phys], Nx, Ny, x0, y0, dx, dy, [cx, cy])
 
     GT = ReconGT.reshape(Ny, Nx)
     GTRest = ReconGTRest.reshape(Ny, Nx)
@@ -282,13 +281,13 @@ def main(OutputRoot=None, ShowFigures=False, Reconkernel=Kernels.RamLak,
         nsDir = OutputRoot / f"Nsources_{Nsources:02d}"
         nsDir.mkdir(parents=True, exist_ok=True)
 
-        DualSource_writeSimulationParameters(
+        StaticCTIOHelpers.DualSource_writeSimulationParameters(
             nsDir, Nsources, TRot, Heartrate, dT,
             RM, M, Npar, N2pi, dtheta, Nx, Ny, dx, dy,
             Shift_GT, Shift_GT_Rest, Rotation, Direction, MotionType, TRest,
             ApplyMoireFilter, SimNoise, N_I0, naming)
 
-        DualSource_appendReconstructionMetrics(
+        StaticCTIOHelpers.DualSource_appendReconstructionMetrics(
             nsDir,
             corr2_single, corr2_multi, corr2_single_rest, corr2_multi_rest,
             rmse_single, rmse_multi, rmse_single_rest, rmse_multi_rest,
@@ -345,4 +344,10 @@ def _ShowReferenceFigure(GT, Single, corr2_single, rmse_single, SelectedPhantom)
         fig.colorbar(handle, ax=ax)
 
     fig.suptitle(f"Reference comparison - Phantom: {SelectedPhantom}")
+    plt.show()
+
+if __name__ == "__main__":
+    import matplotlib.pyplot as plt
+
+    main(ShowFigures=True)
     plt.show()

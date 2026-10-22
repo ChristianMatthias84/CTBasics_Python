@@ -8,9 +8,9 @@ from pathlib import Path
 
 import numpy as np
 
-from ....Memory.Allocation import Allocation
-from ....Reconstruction.Constants import Constants
-from ....Simulation.CreatePhantom import CreatePhantom
+from CTBasics.Memory.Allocation import Allocation
+from CTBasics.Reconstruction.Constants import Constants
+from CTBasics.Simulation.CreatePhantom import CreatePhantom
 
 
 def main(outputDir=None, ShowFigures=False, Nx=512, Ny=512, dx=1, dy=1,
@@ -70,3 +70,9 @@ def main(outputDir=None, ShowFigures=False, Nx=512, Ny=512, dx=1, dy=1,
 
     return {"Frames": Frames, "xpoints": xpoints, "ypoints": ypoints,
             "NT": NT, "lower_window": lower_window, "upper_window": upper_window}
+
+if __name__ == "__main__":
+    import matplotlib.pyplot as plt
+
+    main(ShowFigures=True)
+    plt.show()

@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 
-from ..Memory.Allocation import Allocation
+from CTBasics.Memory.Allocation import Allocation
 
 
 class ImageManipulation:

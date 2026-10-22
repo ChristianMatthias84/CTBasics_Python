@@ -8,16 +8,16 @@ import math
 
 import numpy as np
 
-from .....LecturesAndTestScripts.CTRecon101 import _Save
-from .....Memory.Allocation import Allocation
-from .....ReadAndWrite.IOHelperFunctions import IOHelperFunctions
-from .....Reconstruction.Backprojection import Backprojection
-from .....Reconstruction.Constants import Constants
-from .....Reconstruction.Convolution import Convolution
-from .....Reconstruction.ForwardProjection import ForwardProjection
-from .....Reconstruction.Kernels import Kernels
-from .....Reconstruction.MoireFilter import MoireFilter
-from .....Simulation.Noise import Noise
+from CTBasics.LecturesAndTestScripts.CTRecon101 import _Save
+from CTBasics.Memory.Allocation import Allocation
+from CTBasics.ReadAndWrite.IOHelperFunctions import IOHelperFunctions
+from CTBasics.Reconstruction.Backprojection import Backprojection
+from CTBasics.Reconstruction.Constants import Constants
+from CTBasics.Reconstruction.Convolution import Convolution
+from CTBasics.Reconstruction.ForwardProjection import ForwardProjection
+from CTBasics.Reconstruction.Kernels import Kernels
+from CTBasics.Reconstruction.MoireFilter import MoireFilter
+from CTBasics.Simulation.Noise import Noise
 
 
 def main(Outputdirectory=None, ShowFigures=False, Reconkernel=Kernels.RamLak,
@@ -142,3 +142,9 @@ def main(Outputdirectory=None, ShowFigures=False, Reconkernel=Kernels.RamLak,
                      "x0": x0, "dx": dx, "Nx": Nx, "y0": y0, "dy": dy, "Ny": Ny,
                      "ThetaArray": ThetaArray, "ThetaArray_rand": ThetaArray_rand},
     }
+
+if __name__ == "__main__":
+    import matplotlib.pyplot as plt
+
+    main(ShowFigures=True)
+    plt.show()

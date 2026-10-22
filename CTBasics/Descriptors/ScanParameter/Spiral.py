@@ -1,8 +1,8 @@
 import math
 
-from ..ScannerGeometryTypes import ScannerGeometryTypes
-from ..ScanTypes import ScanTypes
-from .BaseScanParameter import BaseScanParameter
+from CTBasics.Descriptors.ScannerGeometryTypes import ScannerGeometryTypes
+from CTBasics.Descriptors.ScanTypes import ScanTypes
+from CTBasics.Descriptors.ScanParameter.BaseScanParameter import BaseScanParameter
 
 
 class Spiral(BaseScanParameter):
@@ -69,7 +69,7 @@ class Spiral(BaseScanParameter):
 
     def Load(self, DataDescriptor_in):
         """Reads pitch, scan range and start angle of a measured spiral acquisition."""
-        from ...RawData.RawDataScanDescriptor import RawDataScanDescriptor
+        from CTBasics.RawData.RawDataScanDescriptor import RawDataScanDescriptor
 
         RotTime = DataDescriptor_in.ModeParXML.ModePar.RotTime
 

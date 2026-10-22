@@ -1,7 +1,7 @@
 import numpy as np
 
-from ..Memory.Allocation import Allocation
-from .Kernels import Kernels
+from CTBasics.Memory.Allocation import Allocation
+from CTBasics.Reconstruction.Kernels import Kernels
 
 
 class MoireFilter:
@@ -31,7 +31,7 @@ class MoireFilter:
         Each detector row is filtered as one long 1D signal, so the regrouping extracts
         the (n, m) block of a single row before filtering and interleaves it back after.
         """
-        from ..Descriptors.ScanTypes import ScanTypes
+        from CTBasics.Descriptors.ScanTypes import ScanTypes
 
         fstart = 0.2 * (1 / ParGeo_in.dxi)
         fstop = 0.5 * (1 / ParGeo_in.dxi)

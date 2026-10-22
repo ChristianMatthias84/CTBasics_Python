@@ -6,20 +6,20 @@ external reader toolchain, so this script raises transitively when it is unavail
 """
 import numpy as np
 
-from ..Descriptors.Geometries.ParallelBeam import ParallelBeam
-from ..Descriptors.Sampling.FlyingFocalSpot import FlyingFocalSpot
-from ..Descriptors.ScanTypes import ScanTypes
-from ..Descriptors.Volumes.Reconstruction import Reconstruction
-from ..Memory.Allocation import Allocation
-from ..Memory.Precision import Precision
-from ..RawData.RawDataHelperFunctions import RawDataHelperFunctions
-from ..RawData.RawDataScanDescriptor import RawDataScanDescriptor
-from ..Reconstruction.Backprojection import Backprojection
-from ..Reconstruction.Constants import Constants
-from ..Reconstruction.Convolution import Convolution
-from ..Reconstruction.Kernels import Kernels
-from ..Reconstruction.Rebinning import Rebinning
-from .CTRecon101 import _Save
+from CTBasics.Descriptors.Geometries.ParallelBeam import ParallelBeam
+from CTBasics.Descriptors.Sampling.FlyingFocalSpot import FlyingFocalSpot
+from CTBasics.Descriptors.ScanTypes import ScanTypes
+from CTBasics.Descriptors.Volumes.Reconstruction import Reconstruction
+from CTBasics.Memory.Allocation import Allocation
+from CTBasics.Memory.Precision import Precision
+from CTBasics.RawData.RawDataHelperFunctions import RawDataHelperFunctions
+from CTBasics.RawData.RawDataScanDescriptor import RawDataScanDescriptor
+from CTBasics.Reconstruction.Backprojection import Backprojection
+from CTBasics.Reconstruction.Constants import Constants
+from CTBasics.Reconstruction.Convolution import Convolution
+from CTBasics.Reconstruction.Kernels import Kernels
+from CTBasics.Reconstruction.Rebinning import Rebinning
+from CTBasics.LecturesAndTestScripts.CTRecon101 import _Save
 
 
 def main(filename, Outputdirectory=None, ShowFigures=False, Reconkernel=Kernels.RamLak,

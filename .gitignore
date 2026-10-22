@@ -8,15 +8,6 @@ htmlcov/
 build/
 dist/
 *.egg-info/
-validation/matlab_reference/
-validation/generated/
 *.mat
 *.npy
 *.npz
-*.csv
-!docs/migration/*.csv
-!docs/migration/*.md
-
-# Binary reference data copied from the MATLAB library (~215 MB).
-# Remove this entry if the data should be versioned, ideally via Git LFS.
-CTBasics/Data/

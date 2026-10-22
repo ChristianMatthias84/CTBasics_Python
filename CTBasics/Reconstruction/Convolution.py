@@ -1,9 +1,16 @@
 import numpy as np
 
-from ..Descriptors.ScanTypes import ScanTypes
-from ..Memory.Allocation import Allocation
-from ..ReadAndWrite.IOHelperFunctions import IOHelperFunctions
-from .Rebinning import _CachedFilename
+from CTBasics.Descriptors.ScanTypes import ScanTypes
+from CTBasics.Memory.Allocation import Allocation
+from CTBasics.ReadAndWrite.IOHelperFunctions import IOHelperFunctions
+from CTBasics.Reconstruction.Rebinning import _CachedFilename
+
+
+def _ConvolutionMatrix(Kernel, M, start):
+    """Toeplitz matrix T with (row @ T)[i] = full convolution of row and kernel at start + i."""
+    k = start + np.arange(M)[None, :] - np.arange(M)[:, None]
+    valid = (k >= 0) & (k < Kernel.size)
+    return np.where(valid, Kernel[np.where(valid, k, 0)], 0.0)
 
 
 class Convolution:
@@ -57,12 +64,11 @@ class Convolution:
         # so the central window has to be cut explicitly.
         start = (Kernel.size - 1) // 2
 
+        # dxi turns the discrete sum into the integral over the detector coordinate.
         ProjectionsConvolved = Allocation.zeros(M * N)
-        for n in range(1, N + 1):
-            Projection = Projections2D[(n - 1) * M:n * M]
-            full = np.convolve(Projection, Kernel, mode="full")
-            # dxi turns the discrete sum into the integral over the detector coordinate.
-            ProjectionsConvolved[(n - 1) * M:n * M] = full[start:start + M] * dxi
+        ProjectionsConvolved[:] = (
+            (Projections2D[:M * N].reshape(N, M) @ _ConvolutionMatrix(Kernel, M, start)) * dxi
+        ).ravel()
         return ProjectionsConvolved
 
     @staticmethod

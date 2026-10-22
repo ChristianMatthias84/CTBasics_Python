@@ -163,6 +163,43 @@ def test_subset_interleaving_applies_the_global_offset():
     assert np.allclose(np.rad2deg(Shifted), (np.rad2deg(Base) + 30) % 360)
 
 
+def test_subset_interleaving_falls_back_to_linear_order_for_too_many_subsets():
+    with pytest.warns(UserWarning, match="linear scan order"):
+        angles = StaticCTSystemHelperFunctions.SubsetInterleaving(4, 4, "360")
+
+    assert np.allclose(np.rad2deg(angles), [0, 90, 180, 270])
+
+
+def test_greedy_gap_sampling_idx_matches_matlab():
+    # Reference: MATLAB GreedyGapSamplingSubset_idx(7, 5, 11).
+    assert StaticCTSystemHelperFunctions.GreedyGapSamplingSubset_idx(7, 5, 11) == [
+        10, 7, 13, 5, 8, 11, 14]
+
+
+def test_greedy_gap_sampling_idx_rejects_more_picks_than_indices():
+    with pytest.raises(ValueError):
+        StaticCTSystemHelperFunctions.GreedyGapSamplingSubset_idx(5, 1, 4)
+
+
+@pytest.mark.parametrize("N_total, N_subsets, ReconType", [
+    (1024, 3, "180"), (96, 5, "360"), (20, 16, "180")])
+def test_subset_interleaving_idx_visits_every_angle_once(N_total, N_subsets, ReconType):
+    angleArray = np.arange(N_total, dtype=float)
+
+    angles = StaticCTSystemHelperFunctions.SubsetInterleaving_idx(
+        N_total, N_subsets, ReconType, 0, angleArray)
+
+    assert np.array_equal(np.sort(angles), angleArray)
+
+
+def test_subset_interleaving_idx_falls_back_to_input_order():
+    with pytest.warns(UserWarning):
+        angles = StaticCTSystemHelperFunctions.SubsetInterleaving_idx(
+            10, 12, "360", 0.5, np.arange(10.0))
+
+    assert np.array_equal(angles, np.arange(10.0) + 0.5)
+
+
 def test_parallel_geometry_of_the_static_ct_descriptor_is_consistent(staticct3d):
     Descriptor = staticct3d["Descriptor"]
     ParGeo = ParallelBeam(Descriptor)

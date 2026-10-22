@@ -4,7 +4,7 @@ import pytest
 
 from CTBasics.LecturesAndTestScripts import TestMAR, TestScript2D
 
-SMALL = dict(Nxsim=96, Nysim=96, Nx=96, Ny=96, N2pi=192, MFan=193,
+SMALL = dict(Nxsim=96, Nysim=96, Nx=96, Ny=96, N2pi=192, MFan=193, PatientData=False,
              SelectedPhantom="SimpleEllipseWithHips")
 
 
@@ -67,12 +67,14 @@ def test_poisson_noise_increases_the_image_noise(script2d):
     assert noisy_std > quiet_std
 
 
-def test_test_mar_reduces_the_streaks_of_a_metal_hip(monkeypatch):
-    from CTBasics.ReadAndWrite.IOHelperFunctions import IOHelperFunctions
+def test_test_mar_reduces_the_streaks_of_a_metal_hip(tmp_path, monkeypatch):
+    output = tmp_path / "out"
+    output.mkdir()
+    (tmp_path / "Data").mkdir()
+    (tmp_path / "CTBasicsConfig.txt").write_text(f"#\n{tmp_path}\n#\n{output}\n#\n\n")
+    monkeypatch.setenv("CTBASICS_CONFIG", str(tmp_path))
 
-    monkeypatch.setattr(IOHelperFunctions, "Save", staticmethod(lambda *a, **k: None))
-
-    result = TestMAR.main(Nx=96, Ny=96, Npar=128, M=129)
+    result = TestMAR.main(UsePatientData=False, Nx=96, Ny=96, Npar=128, M=129)
 
     Phantom = result["Voxelphantom"].reshape(96, 96)
     # HipWithMetal carries a dense implant well above the metal threshold.
@@ -91,11 +93,7 @@ def test_test_mar_reduces_the_streaks_of_a_metal_hip(monkeypatch):
     assert np.isfinite(result["Result"]).all()
 
 
-def test_test_mar_patient_branch_needs_the_dicom_data(monkeypatch):
-    from CTBasics.ReadAndWrite.IOHelperFunctions import IOHelperFunctions
-
-    monkeypatch.setattr(IOHelperFunctions, "Save", staticmethod(lambda *a, **k: None))
-
+def test_test_mar_patient_branch_needs_the_dicom_data():
     with pytest.raises((FileNotFoundError, OSError)):
         TestMAR.main(UsePatientData=True, DataDirectory="does/not/exist",
                      Nx=32, Ny=32, Npar=16, M=17)

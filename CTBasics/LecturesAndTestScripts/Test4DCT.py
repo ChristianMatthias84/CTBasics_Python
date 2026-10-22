@@ -6,14 +6,14 @@ the individual breathing phases.
 """
 import numpy as np
 
-from ..Memory.Allocation import Allocation
-from ..Reconstruction.Backprojection import Backprojection
-from ..Reconstruction.Constants import Constants
-from ..Reconstruction.Convolution import Convolution
-from ..Reconstruction.ForwardProjection import ForwardProjection
-from ..Reconstruction.Kernels import Kernels
-from ..Reconstruction.MoireFilter import MoireFilter
-from .CTRecon101 import _Save
+from CTBasics.Memory.Allocation import Allocation
+from CTBasics.Reconstruction.Backprojection import Backprojection
+from CTBasics.Reconstruction.Constants import Constants
+from CTBasics.Reconstruction.Convolution import Convolution
+from CTBasics.Reconstruction.ForwardProjection import ForwardProjection
+from CTBasics.Reconstruction.Kernels import Kernels
+from CTBasics.Reconstruction.MoireFilter import MoireFilter
+from CTBasics.LecturesAndTestScripts.CTRecon101 import _Save
 
 
 def main(Outputdirectory=None, ShowFigures=False, Reconkernel=Kernels.RamLak,

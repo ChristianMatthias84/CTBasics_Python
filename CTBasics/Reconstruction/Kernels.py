@@ -1,6 +1,6 @@
 import numpy as np
 
-from ..Memory.Allocation import Allocation
+from CTBasics.Memory.Allocation import Allocation
 
 
 class Kernels:

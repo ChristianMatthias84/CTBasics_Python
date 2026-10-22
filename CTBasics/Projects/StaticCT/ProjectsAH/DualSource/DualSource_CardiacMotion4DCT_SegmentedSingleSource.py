@@ -6,30 +6,27 @@ DualSource_CardiacMotion4DCT_SegmentedSingleSource.m.
 Every segment scans the complete half turn with a shortened rotation time, centred on its
 own slot of the single source read window. Even numbered segments are mirrored along the
 detector axis (xi -> -xi), so the concatenated sinogram holds Nsources * Npi views.
+
+``isSynchronizedSegments=True`` selects the variant of
+DualSource_CardiacMotion4DCT_SegmentedSingleSource_Experiment_to_dual.m, where every
+segment is centred on Shift_GT instead of on its own slot.
 """
 import math
 from pathlib import Path
 
 import numpy as np
 
-from .....Memory.Allocation import Allocation
-from .....MultiCore.Parallelization import Parallelization
-from .....ReadAndWrite.IOHelperFunctions import IOHelperFunctions
-from .....Reconstruction.Backprojection import Backprojection
-from .....Reconstruction.Convolution import Convolution
-from .....Reconstruction.ForwardProjection import ForwardProjection
-from .....Reconstruction.Kernels import Kernels
-from .....Reconstruction.MoireFilter import MoireFilter
-from .....Simulation.Noise import Noise
-from .DualSource_CardiacMotion4DCT_Main import corr2, rmse
-from .HelperFunctions.DualSource_AH_plotScanTimingSegmentedSingle import (
-    DualSource_AH_plotScanTimingSegmentedSingle,
-)
-from .Shared.DualSource_appendReconstructionMetrics import DualSource_appendReconstructionMetrics
-from .Shared.DualSource_buildOutputNaming import DualSource_buildOutputNaming
-from .Shared.DualSource_createGroundTruthGif import DualSource_createGroundTruthGif
-from .Shared.DualSource_showAndSaveImage import DualSource_showAndSaveImage
-from .Shared.DualSource_writeSimulationParameters import DualSource_writeSimulationParameters
+from CTBasics.Memory.Allocation import Allocation
+from CTBasics.MultiCore.Parallelization import Parallelization
+from CTBasics.ReadAndWrite.IOHelperFunctions import IOHelperFunctions
+from CTBasics.Reconstruction.Backprojection import Backprojection
+from CTBasics.Reconstruction.Convolution import Convolution
+from CTBasics.Reconstruction.ForwardProjection import ForwardProjection
+from CTBasics.Reconstruction.Kernels import Kernels
+from CTBasics.Reconstruction.MoireFilter import MoireFilter
+from CTBasics.Simulation.Noise import Noise
+from CTBasics.Projects.StaticCT.ProjectsAH.DualSource.DualSource_CardiacMotion4DCT_Main import corr2, rmse
+from CTBasics.Projects.StaticCT.StaticCTHelperFunctions import StaticCTIOHelpers, StaticCTVisualizationAndEvaluationHelpers
 
 
 def main(Outputdirectory=None, Reconkernel=Kernels.RamLak, ApplyMoireFilter=False,
@@ -38,7 +35,8 @@ def main(Outputdirectory=None, Reconkernel=Kernels.RamLak, ApplyMoireFilter=Fals
          RM=60, M=500, Npar=512, Nx=512, Ny=512, xc=0, yc=0,
          SelectedPhantom="WaterWith4Arteries", PhantomOld=False,
          Heartrate=60, CM=False, Stent=False, Plaque=1,
-         Direction=0, Rotation=0, MotionType="full", TRest=0, Shift_GT=0):
+         Direction=0, Rotation=0, MotionType="full", TRest=0, Shift_GT=0,
+         isSynchronizedSegments=False):
     if Outputdirectory is None:
         Outputdirectory = Path(IOHelperFunctions().GlobalOutputFolderPath) \
             / "cardiacPhantom" / "data"
@@ -67,7 +65,7 @@ def main(Outputdirectory=None, Reconkernel=Kernels.RamLak, ApplyMoireFilter=Fals
     THeartCycle = 60 / Heartrate
     Shift_GT_Rest = THeartCycle - TRest / 2
 
-    naming = DualSource_buildOutputNaming(SelectedPhantom, Plaque, CM, Stent)
+    naming = StaticCTIOHelpers.DualSource_buildOutputNaming(SelectedPhantom, Plaque, CM, Stent)
 
     Outputdirectory = Path(Outputdirectory) / naming["RootFolderLabel"] / (
         f"SegmentedSingle_aRot_{int(Rotation)}"
@@ -80,7 +78,7 @@ def main(Outputdirectory=None, Reconkernel=Kernels.RamLak, ApplyMoireFilter=Fals
     )
     Outputdirectory.mkdir(parents=True, exist_ok=True)
 
-    DualSource_writeSimulationParameters(
+    StaticCTIOHelpers.DualSource_writeSimulationParameters(
         Outputdirectory, Nsources, TRot, Heartrate, dT,
         RM, M, Npar, N2pi, dtheta, Nx, Ny, dx, dy,
         Shift_GT, Shift_GT_Rest, Rotation, Direction, MotionType, TRest,
@@ -101,8 +99,12 @@ def main(Outputdirectory=None, Reconkernel=Kernels.RamLak, ApplyMoireFilter=Fals
 
     Projections_multi = np.empty(0)
     for sourceIdx in range(1, Nsources + 1):
-        segmentStartTime = Shift_GT - Shift_Single + (sourceIdx - 1) * (2 * Shift_Multi)
-        segmentEndTime = Shift_GT - Shift_Single + sourceIdx * (2 * Shift_Multi)
+        if isSynchronizedSegments:
+            segmentStartTime = Shift_GT - Shift_Multi
+            segmentEndTime = Shift_GT + Shift_Multi
+        else:
+            segmentStartTime = Shift_GT - Shift_Single + (sourceIdx - 1) * (2 * Shift_Multi)
+            segmentEndTime = Shift_GT - Shift_Single + sourceIdx * (2 * Shift_Multi)
         segmentCenterTime = (segmentStartTime + segmentEndTime) / 2
 
         ProjSegment, _, _, _, _ = \
@@ -141,15 +143,15 @@ def main(Outputdirectory=None, Reconkernel=Kernels.RamLak, ApplyMoireFilter=Fals
     Projections_groundtruth_rest = np.asarray(Projections_groundtruth_rest).ravel()
 
     if CreateGroundTruthGif:
-        DualSource_createGroundTruthGif(
+        StaticCTIOHelpers.DualSource_createGroundTruthGif(
             Outputdirectory, Nx, Ny, dx, dy, x0, y0,
             Heartrate, CM, Stent, Plaque, Rotation, Direction, MotionType, TRest,
             Shift_GT, TRot, Nsources, Npar, SelectedPhantom)
 
     if VisualiseTime:
-        DualSource_AH_plotScanTimingSegmentedSingle(
+        StaticCTVisualizationAndEvaluationHelpers.DualSource_AH_plotScanTimingSegmentedSingle(
             Heartrate, MotionType, TRest, Shift_GT, TRot, Nsources, THeartCycle,
-            Shift_Single, TRot_segmented)
+            Shift_Single, TRot_segmented, isSynchronizedSegments)
 
     NprojSingle = Projections.size // M
     NprojMulti = Projections_multi.size // M
@@ -212,18 +214,20 @@ def main(Outputdirectory=None, Reconkernel=Kernels.RamLak, ApplyMoireFilter=Fals
         projEnd = min(np.shape(points_single)[1], math.ceil((i * Npi * M) / M))
         midProj = round((projStart + projEnd) / 2)
 
-        cx = max(1, min(Nx, round((points_single[0, midProj - 1] - x0) / dx)))
-        cy = max(1, min(Ny, round((points_single[1, midProj - 1] - y0) / dy)))
+        cx_phys = points_single[0, midProj - 1]
+        cy_phys = points_single[1, midProj - 1]
+        cx = max(1, min(Nx, round((cx_phys - x0) / dx)))
+        cy = max(1, min(Ny, round((cy_phys - y0) / dy)))
 
-        r = 80
-        X, Y = np.meshgrid(np.arange(1, Nx + 1), np.arange(1, Ny + 1))
-        roiMask = ((X - cx) ** 2 + (Y - cy) ** 2) <= r ** 2
+        roiMask, _, _ = StaticCTVisualizationAndEvaluationHelpers.DualSource_buildPhantomRoiMask(
+            SelectedPhantom, [cx_phys, cy_phys], Nx, Ny, x0, y0, dx, dy, [cx, cy])
 
         if showPics:
-            DualSource_showAndSaveImage(Projections[idx], (M, Npi), Outputdirectory,
-                                        "Proj-single", True, params)
-            DualSource_showAndSaveImage(Projections_multi, (M, NprojMulti), Outputdirectory,
-                                        "Proj-multi", True, params)
+            StaticCTIOHelpers.DualSource_showAndSaveImage(
+                Projections[idx], (M, Npi), Outputdirectory, "Proj-single", True, params)
+            StaticCTIOHelpers.DualSource_showAndSaveImage(
+                Projections_multi, (M, NprojMulti), Outputdirectory, "Proj-multi", True,
+                params)
             for name, Data in (
                     ("Proj-ground", Projections_ground[idx]),
                     ("Proj-ground-rest", Projections_ground_rest[idx]),
@@ -234,8 +238,8 @@ def main(Outputdirectory=None, Reconkernel=Kernels.RamLak, ApplyMoireFilter=Fals
                      Projections_ground_rest[idx] - Projections[idx]),
                     ("Diff-ground-rest-multi",
                      Projections_ground_rest[idx] - Projections_multi[idx])):
-                DualSource_showAndSaveImage(Data, (M, Npi), Outputdirectory, name,
-                                            True, params)
+                StaticCTIOHelpers.DualSource_showAndSaveImage(
+                    Data, (M, Npi), Outputdirectory, name, True, params)
 
         theta0_i = theta0 + (i - 1) * Npi * dtheta
 
@@ -268,8 +272,8 @@ def main(Outputdirectory=None, Reconkernel=Kernels.RamLak, ApplyMoireFilter=Fals
                      ReconstructedImage_groundtruth_rest - ReconstructedImage),
                     ("Diff-gt-rest-multi",
                      ReconstructedImage_groundtruth_rest - ReconstructedImage_multi)):
-                DualSource_showAndSaveImage(Data, (Nx, Ny), Outputdirectory, name,
-                                            True, params, roiMask)
+                StaticCTIOHelpers.DualSource_showAndSaveImage(
+                    Data, (Nx, Ny), Outputdirectory, name, True, params, roiMask)
 
         GT = ReconstructedImage_groundtruth.reshape(Ny, Nx)
         GTRest = ReconstructedImage_groundtruth_rest.reshape(Ny, Nx)
@@ -301,7 +305,7 @@ def main(Outputdirectory=None, Reconkernel=Kernels.RamLak, ApplyMoireFilter=Fals
         }
         Metrics.append(Phase)
 
-        DualSource_appendReconstructionMetrics(
+        StaticCTIOHelpers.DualSource_appendReconstructionMetrics(
             Outputdirectory,
             Phase["corr2_single"], Phase["corr2_multi"],
             Phase["corr2_single_rest"], Phase["corr2_multi_rest"],
@@ -338,3 +342,9 @@ def main(Outputdirectory=None, Reconkernel=Kernels.RamLak, ApplyMoireFilter=Fals
                      "Shift_Single": Shift_Single, "Shift_Multi": Shift_Multi,
                      "Shift_GT_Rest": Shift_GT_Rest},
     }
+
+if __name__ == "__main__":
+    import matplotlib.pyplot as plt
+
+    main()
+    plt.show()

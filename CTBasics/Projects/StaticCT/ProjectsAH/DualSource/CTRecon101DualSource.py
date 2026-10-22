@@ -14,15 +14,15 @@ import math
 
 import numpy as np
 
-from .....LecturesAndTestScripts.CTRecon101 import _Save
-from .....ReadAndWrite.IOHelperFunctions import IOHelperFunctions
-from .....Reconstruction.Backprojection import Backprojection
-from .....Reconstruction.Constants import Constants
-from .....Reconstruction.Convolution import Convolution
-from .....Reconstruction.ForwardProjection import ForwardProjection
-from .....Reconstruction.Kernels import Kernels
-from .....Reconstruction.MoireFilter import MoireFilter
-from .....Simulation.CreatePhantom import CreatePhantom
+from CTBasics.LecturesAndTestScripts.CTRecon101 import _Save
+from CTBasics.ReadAndWrite.IOHelperFunctions import IOHelperFunctions
+from CTBasics.Reconstruction.Backprojection import Backprojection
+from CTBasics.Reconstruction.Constants import Constants
+from CTBasics.Reconstruction.Convolution import Convolution
+from CTBasics.Reconstruction.ForwardProjection import ForwardProjection
+from CTBasics.Reconstruction.Kernels import Kernels
+from CTBasics.Reconstruction.MoireFilter import MoireFilter
+from CTBasics.Simulation.CreatePhantom import CreatePhantom
 
 
 def main(Outputdirectory=None, ShowFigures=False, Reconkernel=Kernels.RamLak,
@@ -178,4 +178,10 @@ def _ShowFigures(results, Difference, M, Npar, Nx, Ny, theta0, thetaN, t_per_pro
     plt.title("Angle coverage and irradiation time")
     plt.grid(True)
 
+    plt.show()
+
+if __name__ == "__main__":
+    import matplotlib.pyplot as plt
+
+    main(ShowFigures=True)
     plt.show()

@@ -95,7 +95,7 @@ class ReadRawDataFunctions:
         MATLAB reads only the single character in front of '</NoOfScans>', which caps the
         count at nine; the full tag value is read here instead.
         """
-        from .RawDataScanDescriptor import RawDataScanDescriptor
+        from CTBasics.RawData.RawDataScanDescriptor import RawDataScanDescriptor
 
         TotalScans = RawDataScanDescriptor.Load(DataDescriptor, "NoOfScans")
         if TotalScans is None:

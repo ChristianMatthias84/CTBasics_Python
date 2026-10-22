@@ -3,7 +3,8 @@ import numpy as np
 import pytest
 
 from CTBasics.Reconstruction.Constants import Constants
-from CTBasics.Simulation.CreatePhantom import CreatePhantom
+from CTBasics.Simulation.CreatePhantom import (CreatePhantom, _Grid, _PaintArtery, _PaintStents,
+                                               _R_ARTERY, _R_LUMEN, _R_WATER)
 
 NX = NY = 256
 RM = 250.0
@@ -269,3 +270,25 @@ def test_cardiac_2d_with_motion_validates_the_plaque_type():
         CreatePhantom.CreateVoxelPhantomCardiac2DWithMotion(
             NX, D, ORIGIN, NY, D, ORIGIN, 0.0, 0.01, 0, PlaqueType="banana"
         )
+
+
+@pytest.mark.parametrize("nT", [0, 3, 10])
+@pytest.mark.parametrize("Plaque", [0, 3, 4])
+def test_cardiac_artery_window_matches_full_grid_painting(nT, Plaque):
+    """The artery is painted in a window only; a small FOV clips it at the image border."""
+    N = 48
+    fov = 8.0
+    d = 2 * fov / N
+    origin = -fov - d / 2
+
+    Phantom, _, xd, yd = CreatePhantom.CreateVoxelPhantom2DWithMotionCardiac(
+        N, d, origin, N, d, origin, 0.0, 0.025, nT, Plaque=Plaque, Stent=True, Direction=0.6
+    )
+
+    X, Y = _Grid(N, d, origin, N, d, origin)
+    expected = np.zeros((N, N))
+    expected[X * X + Y * Y <= _R_WATER ** 2] = MU_W
+    _PaintArtery(expected, X - xd, Y - yd, _R_ARTERY, _R_LUMEN, False, Plaque)
+    _PaintStents(expected, X, Y, xd, yd, _R_LUMEN)
+
+    assert np.array_equal(Phantom, expected.ravel())

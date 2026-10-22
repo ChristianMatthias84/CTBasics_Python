@@ -8,9 +8,9 @@ from pathlib import Path
 
 import numpy as np
 
-from ..Memory.Allocation import Allocation
-from ..Memory.Precision import Precision
-from ..Memory.TypeCast import TypeCast
+from CTBasics.Memory.Allocation import Allocation
+from CTBasics.Memory.Precision import Precision
+from CTBasics.Memory.TypeCast import TypeCast
 
 _CONFIG_ENV = "CTBASICS_CONFIG"
 
@@ -20,7 +20,20 @@ def _UserPath() -> Path:
     configured = os.environ.get(_CONFIG_ENV)
     if configured:
         return Path(configured)
-    return Path.home() / "Documents" / "MATLAB"
+    return _DocumentsFolder() / "MATLAB"
+
+
+def _DocumentsFolder() -> Path:
+    """The user's Documents folder as MATLAB resolves it (follows OneDrive redirection on Windows)."""
+    if os.name == "nt":
+        import winreg
+        try:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                                r"Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders") as key:
+                return Path(os.path.expandvars(winreg.QueryValueEx(key, "Personal")[0]))
+        except OSError:
+            pass
+    return Path.home() / "Documents"
 
 
 class IOHelperFunctions:

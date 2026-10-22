@@ -1,11 +1,11 @@
 """Phantom creation, motion, spectra, materials and noise."""
 
-from .CreatePhantom import CreatePhantom
-from .MaterialProperties import MaterialProperties
-from .Materials import Materials
-from .Noise import Noise
-from .Spectra import Spectra
-from .SpectralProperties import SpectralProperties
+from CTBasics.Simulation.CreatePhantom import CreatePhantom
+from CTBasics.Simulation.MaterialProperties import MaterialProperties
+from CTBasics.Simulation.Materials import Materials
+from CTBasics.Simulation.Noise import Noise
+from CTBasics.Simulation.Spectra import Spectra
+from CTBasics.Simulation.SpectralProperties import SpectralProperties
 
 __all__ = [
     "CreatePhantom",

@@ -1,5 +1,5 @@
 """Beam-hardening and projection-domain preprocessing."""
 
-from .WBHC import WBHC
+from CTBasics.Preprocessing.WBHC import WBHC
 
 __all__ = ["WBHC"]

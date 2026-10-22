@@ -2,26 +2,37 @@
 
 ## Read first
 
-- Read the migration guide in `COPILOT_MIGRATION_GUIDE.md` before changing code.
-- Keep the Python port aligned with the MATLAB source tree and the documented milestones.
+- Read `../../CodingGuidelinesAndGeneralPrinciples.md` (general principles for all projects)
+  and `PythonSpecificCodingGuidelines.md` before changing code. Both are referenced by the
+  central `../../.github/copilot-instructions.md`.
+- Read `LibraryConcept.md` for the architecture: packages, data model, pipeline, conventions,
+  and where new code goes. Keep it current when the architecture or a convention changes.
 - Preserve existing user changes and keep edits focused on the requested task.
 
 ## Project and layout
 
-- `CTBasics/` mirrors the MATLAB tree one-to-one: `Descriptors/`, `Simulation/`, `Reconstruction/`, `Preprocessing/`, `ReadAndWrite/`, `RawData/`, `MultiCore/`, `Memory/`, `ImageManipulation/`, `Visualization/`, `Apps/`, `Scripts/`, `Benchmarks/`, `LecturesAndTestScripts/`, and `Projects/`.
-- One MATLAB `classdef` file maps to one Python module of the same name holding one class of the same name; MATLAB method names are kept verbatim (PascalCase/camelCase).
-- `docs/migration/` holds the manifest, inventory, dependency notes, contract, validation plan, progress, and deviations.
-- `validation/matlab_reference/` is reserved for isolated MATLAB reference material and generated comparison artifacts.
-- `tests/unit/`, `tests/parity/`, and `tests/integration/` separate algorithmic checks from MATLAB parity and end-to-end coverage.
+CTBasics is a Python framework for CT simulation and reconstruction (port of the MATLAB
+CTBasics). The package lives in `CTBasics/`, the pytest suite in `tests/` (`unit/`,
+`integration/`), and `RunAllScripts.py` runs all scripts (slow, opens figures). The package
+structure is described in `LibraryConcept.md`.
 
-## Implementation conventions
+## Setup
 
-- Search for existing functionality before adding new code.
-- Prefer one implementation per behavior and avoid duplicate helpers.
-- Keep the public API explicit and document non-obvious numerical choices, axis order, dtype handling, and boundary behavior.
-- Use `pathlib` and configurable resource locations rather than hardcoded paths.
+- Python 3.11+ with the local virtual environment `.venv`; install with
+  `python -m pip install -e .`.
+- The active configuration is `CTBasicsConfig.txt` in the MATLAB user folder
+  (`Documents/MATLAB`, OneDrive redirection is followed) or in the folder given by the
+  environment variable `CTBASICS_CONFIG`. Line 2 is the AI_Coding_Master root holding the
+  shared `Data/` folder,
+  line 4 the output directory, line 6 the external TFS toolbox path. Data and output
+  directories must exist.
 
 ## Validation
 
-- Add the smallest useful test for each ported slice before expanding scope.
-- Record any MATLAB-only or blocked behavior explicitly in the migration docs.
+- Run the focused tests for the changed code, then the full suite before closing a larger
+  change: `.\.venv\Scripts\python.exe -m pytest -q tests`.
+- Scripts can be run directly (`python CTBasics/LecturesAndTestScripts/CTRecon101.py`) or as
+  `main(...)` with small sizes for quick checks.
+- For numerical changes, check dimensions, finite values, and relevant image or quantitative
+  results against a suitable baseline; successful execution alone does not establish
+  reconstruction correctness.

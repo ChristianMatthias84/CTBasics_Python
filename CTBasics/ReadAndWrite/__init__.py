@@ -1,5 +1,5 @@
 """Configuration and file-access helpers."""
 
-from .IOHelperFunctions import IOHelperFunctions
+from CTBasics.ReadAndWrite.IOHelperFunctions import IOHelperFunctions
 
 __all__ = ["IOHelperFunctions"]

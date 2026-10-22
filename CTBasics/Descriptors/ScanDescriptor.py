@@ -1,14 +1,14 @@
 from pathlib import Path
 
-from .Geometries.FanBeam import FanBeam
-from .Geometries.ParallelBeam import ParallelBeam
-from .Geometries.StaticCTBeam import StaticCTBeam
-from .Sampling.AzimuthalSampling import AzimuthalSampling
-from .Sampling.FlyingFocalSpot import FlyingFocalSpot
-from .ScannerGeometryTypes import ScannerGeometryTypes
-from .ScanParameter.Sequence import Sequence
-from .ScanParameter.Spiral import Spiral
-from .ScanTypes import ScanTypes
+from CTBasics.Descriptors.Geometries.FanBeam import FanBeam
+from CTBasics.Descriptors.Geometries.ParallelBeam import ParallelBeam
+from CTBasics.Descriptors.Geometries.StaticCTBeam import StaticCTBeam
+from CTBasics.Descriptors.Sampling.AzimuthalSampling import AzimuthalSampling
+from CTBasics.Descriptors.Sampling.FlyingFocalSpot import FlyingFocalSpot
+from CTBasics.Descriptors.ScannerGeometryTypes import ScannerGeometryTypes
+from CTBasics.Descriptors.ScanParameter.Sequence import Sequence
+from CTBasics.Descriptors.ScanParameter.Spiral import Spiral
+from CTBasics.Descriptors.ScanTypes import ScanTypes
 
 
 class ScanDescriptor:

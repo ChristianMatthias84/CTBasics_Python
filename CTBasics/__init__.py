@@ -5,8 +5,8 @@ re-exports the public classes of every domain, which is the Python equivalent of
 `addpath(genpath(...))` performed by `init_CTBasics.m`.
 """
 
-from .Apps import MAR
-from .Descriptors import (
+from CTBasics.Apps import MAR
+from CTBasics.Descriptors import (
     AzimuthalSampling,
     BaseScanParameter,
     BaseScannerGeometry,
@@ -21,13 +21,13 @@ from .Descriptors import (
     Spiral,
     StaticCTBeam,
 )
-from .ImageManipulation import ImageManipulation
-from .Memory import Allocation, Precision, TypeCast
-from .MultiCore import CPU, Parallelization, RAM
-from .Preprocessing import WBHC
-from .RawData import RawDataHelperFunctions, RawDataScanDescriptor, ReadRawDataFunctions
-from .ReadAndWrite import IOHelperFunctions
-from .Reconstruction import (
+from CTBasics.ImageManipulation import ImageManipulation
+from CTBasics.Memory import Allocation, Precision, TypeCast
+from CTBasics.MultiCore import CPU, Parallelization, RAM
+from CTBasics.Preprocessing import WBHC
+from CTBasics.RawData import RawDataHelperFunctions, RawDataScanDescriptor, ReadRawDataFunctions
+from CTBasics.ReadAndWrite import IOHelperFunctions
+from CTBasics.Reconstruction import (
     Backprojection,
     Constants,
     Convolution,
@@ -36,8 +36,8 @@ from .Reconstruction import (
     MoireFilter,
     Rebinning,
 )
-from .Scripts import ColliScript
-from .Simulation import (
+from CTBasics.Scripts import ColliScript
+from CTBasics.Simulation import (
     CreatePhantom,
     MaterialProperties,
     Materials,
@@ -45,7 +45,7 @@ from .Simulation import (
     Spectra,
     SpectralProperties,
 )
-from .Visualization import VisualizationTests
+from CTBasics.Visualization import StaticCTVisualizationFunctionalitites
 
 __all__ = [
     "Allocation",
@@ -87,6 +87,6 @@ __all__ = [
     "Spiral",
     "StaticCTBeam",
     "TypeCast",
-    "VisualizationTests",
+    "StaticCTVisualizationFunctionalitites",
     "WBHC",
 ]

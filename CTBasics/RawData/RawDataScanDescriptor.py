@@ -7,7 +7,7 @@ class RawDataScanDescriptor:
     @staticmethod
     def LoadFromFile(filename):
         """Returns (ScanDescriptor, Readings) for a measured raw-data file."""
-        from .ReadRawDataFunctions import ReadRawDataFunctions
+        from CTBasics.RawData.ReadRawDataFunctions import ReadRawDataFunctions
 
         Readings, _, DataDescriptor = ReadRawDataFunctions.ReadRawData(filename)
 
@@ -41,9 +41,9 @@ class RawDataScanDescriptor:
     @staticmethod
     def Init(DataDescriptor_in):
         """Creates the matching fan-beam ScanDescriptor and loads it from the raw data."""
-        from ..Descriptors.ScanDescriptor import ScanDescriptor
-        from ..Descriptors.ScannerGeometryTypes import ScannerGeometryTypes
-        from ..Descriptors.ScanTypes import ScanTypes
+        from CTBasics.Descriptors.ScanDescriptor import ScanDescriptor
+        from CTBasics.Descriptors.ScannerGeometryTypes import ScannerGeometryTypes
+        from CTBasics.Descriptors.ScanTypes import ScanTypes
 
         Scans = len(DataDescriptor_in) if isinstance(DataDescriptor_in, (list, tuple)) else 1
         DataDescriptor = DataDescriptor_in[0] if Scans > 1 else DataDescriptor_in

@@ -1,37 +1,33 @@
 """Prospectively gated 4D CT: linear versus subset interleaved scan order.
 
 Port of Projects/Static CT/Projects JP/test_4DCT_prosp.m. The MATLAB script caches the
-linear and ground truth reconstructions in a .mat file so that only the arbitrary order
-scan has to be recomputed when sweeping NSubsets; the port keeps that cache (scipy .mat).
+linear and ground truth reconstructions in a .mat file together with the phantom flags
+and simulation parameters; the cache is only reused when all of them match. MATLAB
+currently forces a fresh linear reconstruction (``linearRecon = true``), mirrored by
+``ForceLinearRecon=True``.
 
-SimNoise/N_I0 are off by default so that the JP behaviour is bit identical to MATLAB.
-They exist because Projects CH/StaticCT_4_RealTimeImaging_Script_CH.m is the same script
-with a Poisson noise stage added, and the port shares one implementation instead of
-duplicating 400 lines.
+Every phase is reconstructed twice: per scan segment (then averaged) and from the
+concatenated long sinogram; the metrics use the long sinogram reconstruction.
 """
 import math
 from pathlib import Path
 
 import numpy as np
 
-from ....Memory.Allocation import Allocation
-from ....MultiCore.Parallelization import Parallelization
-from ....RawData.RawDataHelperFunctions import RawDataHelperFunctions
-from ....ReadAndWrite.IOHelperFunctions import IOHelperFunctions
-from ....Reconstruction.Backprojection import Backprojection
-from ....Reconstruction.Constants import Constants
-from ....Reconstruction.Convolution import Convolution
-from ....Reconstruction.ForwardProjection import ForwardProjection
-from ....Reconstruction.Kernels import Kernels
-from ....Reconstruction.MoireFilter import MoireFilter
-from ....Simulation.CreatePhantom import CreatePhantom
-from ....Simulation.Noise import Noise
-from .StaticCT_appendReconstructionMetrics import StaticCT_appendReconstructionMetrics
-from .StaticCT_computeReconstructionMetrics import StaticCT_computeReconstructionMetrics
-from .StaticCT_createSubsetAnimationGif import StaticCT_createSubsetAnimationGif
-from .StaticCT_plotReconstructionResults import StaticCT_plotReconstructionResults
-from ..StaticCTHelperFunctions.StaticCTSystemHelperFunctions import \
-    StaticCTSystemHelperFunctions
+from CTBasics.Memory.Allocation import Allocation
+from CTBasics.MultiCore.Parallelization import Parallelization
+from CTBasics.RawData.RawDataHelperFunctions import RawDataHelperFunctions
+from CTBasics.ReadAndWrite.IOHelperFunctions import IOHelperFunctions
+from CTBasics.Reconstruction.Backprojection import Backprojection
+from CTBasics.Reconstruction.Constants import Constants
+from CTBasics.Reconstruction.Convolution import Convolution
+from CTBasics.Reconstruction.ForwardProjection import ForwardProjection
+from CTBasics.Reconstruction.Kernels import Kernels
+from CTBasics.Reconstruction.MoireFilter import MoireFilter
+from CTBasics.Simulation.CreatePhantom import CreatePhantom
+from CTBasics.Simulation.Noise import Noise
+from CTBasics.Projects.StaticCT.StaticCTHelperFunctions import (StaticCTIOHelpers, StaticCTSystemHelperFunctions,
+                                       StaticCTVisualizationAndEvaluationHelpers)
 
 # Array for the consecutive simulation of different subset counts (MATLAB keeps it as a
 # convenience variable for manual sweeps).
@@ -39,19 +35,22 @@ NSubsets_array = [2, 4, 8, 16, 32, 64, 128]
 
 
 def main(Outputdirectory_base=None, reconType="180",
-         Reconkernel=Kernels.RamLak, ApplyMoireFilter=False,
-         NSubsets=64, NRecons=8, SelectedPhantom="Respiratory",
-         Heartrate=60, Motion=True, Direction=0, MotionType="full", TRest=0,
-         CM=False, Stent=False, Plaque=1, Rotation=0,
-         isplot=True, phasesToPlot=(1, 3), isGIF=False, writeData=True,
+         Reconkernel=Kernels.RamLak, ApplyMoireFilter=False, SimNoise=False, N_I0=1e7,
+         NSubsets=64, NRecons=4, SelectedPhantom="Cardiac",
+         Heartrate=60, Motion=True, Direction=0, MotionType="half", TRest=0.5,
+         CM=False, Stent=False, Plaque=1, Rotation=math.pi / 4,
+         isplot=True, phasesToPlot=(1, 3, 4), isGIF=False, writeData=True,
          NScansPerRecon=1, TRot=0.5, RM=None, M=500, N2pi=1024, Nx=512, Ny=512,
-         UseLinearCache=True, SimNoise=False, N_I0=100000 / 5):
+         UseLinearCache=True, ForceLinearRecon=True):
     if Outputdirectory_base is None:
         Outputdirectory_base = Path(IOHelperFunctions().GlobalOutputFolderPath) \
             / "cardiacPhantom" / "data"
     Outputdirectory_base = Path(Outputdirectory_base)
 
     Parallelization.Init()
+
+    PhantomFlags = [SelectedPhantom, Heartrate, Motion, Direction, MotionType, TRest,
+                    CM, Stent, Plaque, Rotation]
 
     THeart = 60 / Heartrate  # duration of one heart cycle
 
@@ -81,9 +80,14 @@ def main(Outputdirectory_base=None, reconType="180",
     x0 = -RM - dx / 2.0
     y0 = -RM - dy / 2.0
 
+    # MATLAB lists the class MoireFilter here; the flag is what changes the result.
+    SimParams = [TRot, NRecons, NScansPerRecon, RM, M, N2pi, reconType, SimNoise, N_I0,
+                 Reconkernel, ApplyMoireFilter]
+
+    ThetaArray = np.linspace(0, 2 * math.pi, N2pi + 1)[:-1]
+    # MATLAB hardcodes 2 subsets here; NSubsets only labels outputs and the GIF.
     ThetaArray_arbitrary = StaticCTSystemHelperFunctions.SubsetInterleaving(
-        N2pi, NSubsets, reconType, 0)
-    ThetaArray = np.linspace(0, 2 * math.pi - dtheta, N2pi)
+        N2pi, 2, reconType, 0)
 
     Outputdirectory_base.mkdir(parents=True, exist_ok=True)
     linearScan_fullfile = Outputdirectory_base / (
@@ -91,10 +95,10 @@ def main(Outputdirectory_base=None, reconType="180",
         f"_NScans{NScansPerRecon}_{int(reconType)}Recon"
         f"_{round(math.degrees(Direction))}deg_{SelectedPhantom}.mat")
 
-    cache = None
+    linearScanData = None
     if UseLinearCache and linearScan_fullfile.is_file():
         from scipy.io import loadmat
-        cache = loadmat(str(linearScan_fullfile))
+        linearScanData = loadmat(str(linearScan_fullfile))
         linearRecon = False  # linear recon for these parameters already exists
     else:
         linearRecon = True
@@ -109,11 +113,16 @@ def main(Outputdirectory_base=None, reconType="180",
     # GIF does not repeat the starting point (t = 0 equals t = THeart).
     TRecon = np.linspace(0, THeart, NRecons + 1)[:-1]
 
+    if ForceLinearRecon:
+        linearRecon = True  # MATLAB: overwrite the cache after changes in linear/GT
+
     if not linearRecon:
-        TRecon_save = np.asarray(cache["TRecon_save"], dtype=float).ravel()
-        if not np.array_equal(TRecon, TRecon_save):
-            raise ValueError("selected and saved reconstrution times are different. "
-                             "linear reconstruction can not be used!")
+        if not _CacheMatches(linearScanData, TRecon, PhantomFlags, SimParams):
+            print("selected and saved reconstruction times are different. linear "
+                  "reconstruction can not be used! linear Recon must be done again.")
+            linearRecon = True
+        else:
+            print("Previous linear recon will be used...")
 
     TLeft = TRecon - TReconInterval / 2   # start time
     TRight = TRecon + TReconInterval / 2  # end time
@@ -173,12 +182,6 @@ def main(Outputdirectory_base=None, reconType="180",
                         MotionType=MotionType, TRest=TRest)
                 Projections_GT[k - 1][j - 1, :] = np.asarray(ProjGT).ravel()
 
-    if not linearRecon:
-        Projections_linear = [np.asarray(x, dtype=float)
-                              for x in _UnpackCell(cache["Projections_linear_save"])]
-        Projections_GT = [np.asarray(x, dtype=float)
-                          for x in _UnpackCell(cache["Projections_GT_save"])]
-
     Projections_diff = [Projections_arbitrary[k] - Projections_linear[k]
                         for k in range(NRecons)]
 
@@ -200,17 +203,6 @@ def main(Outputdirectory_base=None, reconType="180",
 
     PhantomTruthHU = 1000 * (PhantomTruth - Constants.MuW) / Constants.MuW
 
-    if SimNoise:
-        print("Applying Poisson Noise to projections...")
-        for k in range(NRecons):
-            for j in range(NScansPerRecon):
-                Projections_arbitrary[k][j, :] = Noise.ApplyPoissonNoise(
-                    Projections_arbitrary[k][j, :], M * N, N_I0)
-                Projections_linear[k][j, :] = Noise.ApplyPoissonNoise(
-                    Projections_linear[k][j, :], M * N, N_I0)
-                Projections_GT[k][j, :] = Noise.ApplyPoissonNoise(
-                    Projections_GT[k][j, :], M * N, N_I0)
-
     if ApplyMoireFilter:
         for k in range(NRecons):
             for j in range(NScansPerRecon):
@@ -221,6 +213,19 @@ def main(Outputdirectory_base=None, reconType="180",
                     MoireFilter.ApplyMoireFilterOnProjections(
                         Projections_arbitrary[k][j, :], N, M, dxi, 0.0 * (1 / dxi),
                         0.5 * (1 / dxi))
+
+    N_I0_per_scan = None
+    if SimNoise:
+        # The photon budget of one reconstruction is shared by its scan segments.
+        N_I0_per_scan = N_I0 / NScansPerRecon
+        for k in range(NRecons):
+            for j in range(NScansPerRecon):
+                Projections_linear[k][j, :] = Noise.ApplyPoissonNoise(
+                    Projections_linear[k][j, :], Projections_linear[k][j, :].size,
+                    N_I0_per_scan)
+                Projections_arbitrary[k][j, :] = Noise.ApplyPoissonNoise(
+                    Projections_arbitrary[k][j, :], Projections_arbitrary[k][j, :].size,
+                    N_I0_per_scan)
 
     Kernel = None
     if Reconkernel == Kernels.SheppLogan:
@@ -239,6 +244,57 @@ def main(Outputdirectory_base=None, reconType="180",
 
     Projections_linear_save = [x.copy() for x in Projections_linear]
     Projections_GT_save = [x.copy() for x in Projections_GT]
+
+    if not linearRecon:
+        Projections_linear = _UnpackCell(linearScanData["Projections_linear_save"])
+        Projections_GT = _UnpackCell(linearScanData["Projections_GT_save"])
+        # MATLAB would re-save the never computed linear/GT projections here.
+        Projections_linear_save = [x.copy() for x in Projections_linear]
+        Projections_GT_save = [x.copy() for x in Projections_GT]
+
+    # Backprojection with averaging: each scan segment is reconstructed on its own
+    # angular interval (second half turn starts at pi for 180 degree scans).
+    ReconstructedImage_arbitrary_single = np.zeros((NRecons, NScansPerRecon, Nx * Ny))
+    ReconstructedImage_linear_single = np.zeros((NRecons, NScansPerRecon, Nx * Ny))
+
+    for k in range(1, NRecons + 1):
+        for j in range(1, NScansPerRecon + 1):
+            theta0_scan = theta0
+            if reconType == "180" and j % 2 == 0:
+                theta0_scan = math.pi
+
+            ReconstructedImage_arbitrary_single[k - 1, j - 1, :] = \
+                Backprojection.PixDrivenBackProjParCartesian(
+                    theta0_scan, dtheta, N, N2pi, xi0, dxi, M,
+                    Projections_arbitrary[k - 1][j - 1, :], x0, dx, Nx, y0, dy, Ny)
+            ReconstructedImage_linear_single[k - 1, j - 1, :] = \
+                Backprojection.PixDrivenBackProjParCartesian(
+                    theta0_scan, dtheta, N, N2pi, xi0, dxi, M,
+                    Projections_linear[k - 1][j - 1, :], x0, dx, Nx, y0, dy, Ny)
+
+    MultiphaseRecon_linear_avg = Allocation.zeros(NRecons, Nx * Ny)
+    MultiphaseRecon_arbitrary_avg = Allocation.zeros(NRecons, Nx * Ny)
+    for k in range(NRecons):
+        sum_arbitrary = np.zeros(Nx * Ny)
+        sum_linear = np.zeros(Nx * Ny)
+        for j in range(NScansPerRecon):
+            sum_arbitrary = sum_arbitrary + ReconstructedImage_arbitrary_single[k, j, :]
+            sum_linear = sum_linear + ReconstructedImage_linear_single[k, j, :]
+        MultiphaseRecon_linear_avg[k, :] = sum_linear / NScansPerRecon
+        MultiphaseRecon_arbitrary_avg[k, :] = sum_arbitrary / NScansPerRecon
+
+    MultiphaseReconHU_linear_avg = \
+        1000 * (MultiphaseRecon_linear_avg - Constants.MuW) / Constants.MuW
+    MultiphaseReconHU_arbitrary_avg = \
+        1000 * (MultiphaseRecon_arbitrary_avg - Constants.MuW) / Constants.MuW
+    ReconstructedImage_arbitrary_single_HU = \
+        1000 * (ReconstructedImage_arbitrary_single - Constants.MuW) / Constants.MuW
+
+    phaseIdx = min(2, NRecons)  # phase to inspect (1..NRecons)
+    if isplot:
+        _PlotSingleScans(ReconstructedImage_arbitrary_single_HU,
+                         MultiphaseReconHU_arbitrary_avg, phaseIdx, NScansPerRecon,
+                         Nx, Ny)
 
     MultiphaseRecon_linear = Allocation.zeros(NRecons, Nx * Ny)
     MultiphaseRecon_arbitrary = Allocation.zeros(NRecons, Nx * Ny)
@@ -267,9 +323,10 @@ def main(Outputdirectory_base=None, reconType="180",
                 FlatArbitrary[k - 1], x0, dx, Nx, y0, dy, Ny)
 
     if not linearRecon:
-        MultiphaseRecon_linear = np.asarray(cache["MultiphaseRecon_linear_save"],
-                                            dtype=float)
-        MultiphaseRecon_GT = np.asarray(cache["MultiphaseRecon_GT_save"], dtype=float)
+        MultiphaseRecon_linear = np.asarray(
+            linearScanData["MultiphaseRecon_linear_save"], dtype=float)
+        MultiphaseRecon_GT = np.asarray(linearScanData["MultiphaseRecon_GT_save"],
+                                        dtype=float)
 
     MultiphaseReconHU_linear = \
         1000 * (MultiphaseRecon_linear - Constants.MuW) / Constants.MuW
@@ -284,13 +341,33 @@ def main(Outputdirectory_base=None, reconType="180",
     MultiphaseRecon_linear_save = MultiphaseRecon_linear.copy()
     MultiphaseRecon_GT_save = MultiphaseRecon_GT.copy()
 
+    # Long sinogram reconstruction versus the average of the single scan reconstructions.
+    MultiphaseRecon_linear_delta = MultiphaseReconHU_linear - MultiphaseReconHU_linear_avg
+    MultiphaseRecon_arbitrary_delta = \
+        MultiphaseReconHU_arbitrary - MultiphaseReconHU_arbitrary_avg
+
+    eps = np.finfo(float).eps
+    maxAbsDelta_linear = float(np.max(np.abs(MultiphaseRecon_linear_delta)))
+    maxAbsDelta_arbitrary = float(np.max(np.abs(MultiphaseRecon_arbitrary_delta)))
+    relDiff_linear = float(np.linalg.norm(MultiphaseRecon_linear_delta.ravel())
+                           / max(np.linalg.norm(MultiphaseReconHU_linear.ravel()), eps))
+    relDiff_arbitrary = float(
+        np.linalg.norm(MultiphaseRecon_arbitrary_delta.ravel())
+        / max(np.linalg.norm(MultiphaseReconHU_arbitrary.ravel()), eps))
+
+    print("Comparison long-sinogram vs averaged single-scan reconstructions:")
+    print(f"  Linear: max abs delta = {maxAbsDelta_linear:.6e} HU, "
+          f"relative norm diff = {relDiff_linear:.6e}")
+    print(f"  Arbitrary: max abs delta = {maxAbsDelta_arbitrary:.6e} HU, "
+          f"relative norm diff = {relDiff_arbitrary:.6e}")
+
     roi_radius = 60 if SelectedPhantom == "Respiratory" else 15
 
     (RMSE_linear, RMSE_arbitrary, NCC_linear, NCC_arbitrary,
      ssim_linear, ssim_arbitrary, nRoI, roi_mask, center_mask) = \
-        StaticCT_computeReconstructionMetrics(
+        StaticCTVisualizationAndEvaluationHelpers.StaticCT_computeReconstructionMetrics(
             MultiphaseReconHU_linear, MultiphaseReconHU_arbitrary,
-            MultiphaseReconHU_GT, RoI_all, Nx, Ny, x0, y0, dx, dy, roi_radius)
+            MultiphaseReconHU_GT, RoI_all, Nx, Ny, x0, y0, dx, dy, roi_radius)[:9]
 
     if SelectedPhantom == "Respiratory":
         WC, WW = -600, 1500
@@ -298,7 +375,7 @@ def main(Outputdirectory_base=None, reconType="180",
         WC, WW = 0, 500
 
     if isplot:
-        StaticCT_plotReconstructionResults(
+        StaticCTVisualizationAndEvaluationHelpers.StaticCT_plotReconstructionResults(
             MultiphaseReconHU_GT, MultiphaseReconHU_linear, MultiphaseReconHU_arbitrary,
             MultiphaseRecon_linear_GT, MultiphaseRecon_arbitrary_GT,
             RMSE_linear, RMSE_arbitrary, NCC_linear, NCC_arbitrary,
@@ -332,7 +409,7 @@ def main(Outputdirectory_base=None, reconType="180",
 
     summary = None
     if writeData:
-        summary = StaticCT_appendReconstructionMetrics(
+        summary = StaticCTIOHelpers.StaticCT_appendReconstructionMetrics(
             Outputdirectory, SelectedPhantom, TRecon,
             RMSE_linear, RMSE_arbitrary, NCC_linear, NCC_arbitrary,
             ssim_linear, ssim_arbitrary,
@@ -405,10 +482,12 @@ def main(Outputdirectory_base=None, reconType="180",
              "Projections_linear_save": np.array(Projections_linear_save),
              "MultiphaseRecon_linear_save": MultiphaseRecon_linear_save,
              "Projections_GT_save": np.array(Projections_GT_save),
-             "MultiphaseRecon_GT_save": MultiphaseRecon_GT_save})
+             "MultiphaseRecon_GT_save": MultiphaseRecon_GT_save,
+             "PhantomFlags": _ToCell(PhantomFlags),
+             "SimParams": _ToCell(SimParams)})
 
     if isGIF:
-        StaticCT_createSubsetAnimationGif(
+        StaticCTIOHelpers.StaticCT_createSubsetAnimationGif(
             ThetaArray_arbitrary, reconType, NSubsets, Outputdirectory,
             MaxAngles=100, MaxFrames=100, DelayTime=0.25, Visible=False)
 
@@ -420,6 +499,8 @@ def main(Outputdirectory_base=None, reconType="180",
         "Outputdirectory": str(Outputdirectory),
         "linearScan_fullfile": str(linearScan_fullfile),
         "linearRecon": linearRecon,
+        "PhantomFlags": PhantomFlags, "SimParams": SimParams,
+        "N_I0_per_scan": N_I0_per_scan,
         "TRecon": TRecon, "TLeft": TLeft, "TRight": TRight,
         "ThetaArray": ThetaArray, "ThetaArray_arbitrary": ThetaArray_arbitrary,
         "Projections_linear": Projections_linear,
@@ -430,6 +511,19 @@ def main(Outputdirectory_base=None, reconType="180",
         "RoI_all": RoI_all, "displacements": displacements,
         "center_points_1": center_points_1,
         "Kernel": Kernel,
+        "ReconstructedImage_arbitrary_single": ReconstructedImage_arbitrary_single,
+        "ReconstructedImage_linear_single": ReconstructedImage_linear_single,
+        "ReconstructedImage_arbitrary_single_HU": ReconstructedImage_arbitrary_single_HU,
+        "MultiphaseRecon_linear_avg": MultiphaseRecon_linear_avg,
+        "MultiphaseRecon_arbitrary_avg": MultiphaseRecon_arbitrary_avg,
+        "MultiphaseReconHU_linear_avg": MultiphaseReconHU_linear_avg,
+        "MultiphaseReconHU_arbitrary_avg": MultiphaseReconHU_arbitrary_avg,
+        "MultiphaseRecon_linear_delta": MultiphaseRecon_linear_delta,
+        "MultiphaseRecon_arbitrary_delta": MultiphaseRecon_arbitrary_delta,
+        "maxAbsDelta_linear": maxAbsDelta_linear,
+        "maxAbsDelta_arbitrary": maxAbsDelta_arbitrary,
+        "relDiff_linear": relDiff_linear, "relDiff_arbitrary": relDiff_arbitrary,
+        "phaseIdx": phaseIdx,
         "MultiphaseRecon_linear": MultiphaseRecon_linear,
         "MultiphaseRecon_arbitrary": MultiphaseRecon_arbitrary,
         "MultiphaseRecon_GT": MultiphaseRecon_GT,
@@ -459,7 +553,65 @@ def _UnpackCell(value):
     Array = np.asarray(value)
     if Array.dtype == object:
         return [np.asarray(x, dtype=float) for x in Array.ravel()]
-    return [Array[k] for k in range(Array.shape[0])]
+    return [np.array(Array[k], dtype=float) for k in range(Array.shape[0])]
+
+
+def _ToCell(values):
+    """Wraps a mixed list so that scipy writes it as a MATLAB cell array."""
+    Cell = np.empty(len(values), dtype=object)
+    Cell[:] = list(values)
+    return Cell
+
+
+def _CellEqual(saved, current):
+    """MATLAB isequal for a cell of scalars/strings after a scipy .mat round trip."""
+    Saved = np.asarray(saved, dtype=object).ravel()
+    if Saved.size != len(current):
+        return False
+    for Entry, Value in zip(Saved, current):
+        Entry = np.asarray(Entry)
+        if isinstance(Value, str):
+            if Entry.dtype.kind != "U" or "".join(Entry.ravel().tolist()) != Value:
+                return False
+        elif Entry.dtype.kind not in "biuf" or Entry.size != 1 \
+                or float(Entry.ravel()[0]) != float(Value):
+            return False
+    return True
+
+
+def _CacheMatches(linearScanData, TRecon, PhantomFlags, SimParams):
+    """True if the cached linear scan was produced with the same times and parameters."""
+    if any(key not in linearScanData for key in ("TRecon_save", "PhantomFlags",
+                                                 "SimParams")):
+        return False
+    TRecon_save = np.asarray(linearScanData["TRecon_save"], dtype=float).ravel()
+    return (np.array_equal(TRecon, TRecon_save)
+            and _CellEqual(linearScanData["PhantomFlags"], PhantomFlags)
+            and _CellEqual(linearScanData["SimParams"], SimParams))
+
+
+def _PlotSingleScans(ReconstructedImage_arbitrary_single_HU,
+                     MultiphaseReconHU_arbitrary_avg, phaseIdx, NScansPerRecon, Nx, Ny):
+    import matplotlib.pyplot as plt
+
+    fig, axes = plt.subplots(
+        1, NScansPerRecon + 1, facecolor="w", squeeze=False,
+        num=f"Phase {phaseIdx}: individual scans vs. average")
+    axes = axes[0]
+
+    for j in range(NScansPerRecon):
+        img = ReconstructedImage_arbitrary_single_HU[phaseIdx - 1, j, :].reshape(Ny, Nx)
+        axes[j].imshow(img, cmap="gray", vmin=-250, vmax=250)
+        axes[j].axis("off")
+        axes[j].set_title(f"Scan {j + 1} (single reconstruction)")
+
+    avgImg = MultiphaseReconHU_arbitrary_avg[phaseIdx - 1, :].reshape(Ny, Nx)
+    axes[-1].imshow(avgImg, cmap="gray", vmin=-250, vmax=250)
+    axes[-1].axis("off")
+    axes[-1].set_title(f"Average of {NScansPerRecon} scans (phase {phaseIdx})")
+
+    fig.suptitle(f"Arbitrary reconstruction for phase {phaseIdx}")
+    return fig
 
 
 def _NormalizedMotion(t, Motion, Heartrate, TRest, MotionType):
@@ -490,7 +642,9 @@ def _NormalizedMotion(t, Motion, Heartrate, TRest, MotionType):
 
 def _PlotSampling(t, xDisplacement, yDisplacement, TRecon, TLeft, TRight, displacements,
                   xDisplacement_discrete, yDisplacement_discrete, xDisplacement_rot,
-                  yDisplacement_rot, NScansPerRecon, TRot, show):
+                  yDisplacement_rot, NScansPerRecon, TRot, show,
+                  axisLimits=(-0.2, 1.2, -11, 11)):
+    """axisLimits=None keeps autoscaling (MATLAB scripts with the axis call commented)."""
     import matplotlib.pyplot as plt
 
     figx, axes = plt.subplots(1, 2)
@@ -520,10 +674,17 @@ def _PlotSampling(t, xDisplacement, yDisplacement, TRecon, TLeft, TRight, displa
         ax.legend()
         ax.set_xlabel("time in s")
         ax.set_ylabel(label)
-        ax.axis([-0.2, 1.2, -11, 11])
+        if axisLimits is not None:
+            ax.axis(list(axisLimits))
         ax.grid(True)
 
     if show:
         plt.show()
 
     return figx
+
+if __name__ == "__main__":
+    import matplotlib.pyplot as plt
+
+    main()
+    plt.show()

@@ -7,15 +7,15 @@ from pathlib import Path
 
 import numpy as np
 
-from ....LecturesAndTestScripts.CTRecon101 import _Save
-from ....Memory.Allocation import Allocation
-from ....ReadAndWrite.IOHelperFunctions import IOHelperFunctions
-from ....Reconstruction.Backprojection import Backprojection
-from ....Reconstruction.Constants import Constants
-from ....Reconstruction.Convolution import Convolution
-from ....Reconstruction.ForwardProjection import ForwardProjection
-from ....Reconstruction.Kernels import Kernels
-from ....Reconstruction.MoireFilter import MoireFilter
+from CTBasics.LecturesAndTestScripts.CTRecon101 import _Save
+from CTBasics.Memory.Allocation import Allocation
+from CTBasics.ReadAndWrite.IOHelperFunctions import IOHelperFunctions
+from CTBasics.Reconstruction.Backprojection import Backprojection
+from CTBasics.Reconstruction.Constants import Constants
+from CTBasics.Reconstruction.Convolution import Convolution
+from CTBasics.Reconstruction.ForwardProjection import ForwardProjection
+from CTBasics.Reconstruction.Kernels import Kernels
+from CTBasics.Reconstruction.MoireFilter import MoireFilter
 
 
 def main(Outputdirectory=None, writeData=True, reconType="multiphase",
@@ -258,4 +258,10 @@ def _ShowPhaseComparison(MultiphaseReconHU_3dim, MultiphaseReconHU_rand_3dim,
                 ax.set_title(title)
             ax.axis("off")
 
+    plt.show()
+
+if __name__ == "__main__":
+    import matplotlib.pyplot as plt
+
+    main()
     plt.show()

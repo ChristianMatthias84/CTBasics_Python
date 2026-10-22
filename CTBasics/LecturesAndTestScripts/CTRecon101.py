@@ -6,13 +6,13 @@ without a CTBasicsConfig.txt.
 """
 import numpy as np
 
-from ..Reconstruction.Backprojection import Backprojection
-from ..Reconstruction.Constants import Constants
-from ..Reconstruction.Convolution import Convolution
-from ..Reconstruction.ForwardProjection import ForwardProjection
-from ..Reconstruction.Kernels import Kernels
-from ..Reconstruction.MoireFilter import MoireFilter
-from ..Simulation.CreatePhantom import CreatePhantom
+from CTBasics.Reconstruction.Backprojection import Backprojection
+from CTBasics.Reconstruction.Constants import Constants
+from CTBasics.Reconstruction.Convolution import Convolution
+from CTBasics.Reconstruction.ForwardProjection import ForwardProjection
+from CTBasics.Reconstruction.Kernels import Kernels
+from CTBasics.Reconstruction.MoireFilter import MoireFilter
+from CTBasics.Simulation.CreatePhantom import CreatePhantom
 
 
 def main(Outputdirectory=None, ShowFigures=False, Reconkernel=Kernels.RamLak, ApplyMoireFilter=False,

@@ -7,22 +7,19 @@ from pathlib import Path
 
 import numpy as np
 
-from ....Memory.Allocation import Allocation
-from ....MultiCore.Parallelization import Parallelization
-from ....RawData.RawDataHelperFunctions import RawDataHelperFunctions
-from ....ReadAndWrite.IOHelperFunctions import IOHelperFunctions
-from ....Reconstruction.Backprojection import Backprojection
-from ....Reconstruction.Constants import Constants
-from ....Reconstruction.Convolution import Convolution
-from ....Reconstruction.ForwardProjection import ForwardProjection
-from ....Reconstruction.Kernels import Kernels
-from ....Reconstruction.MoireFilter import MoireFilter
-from ....Simulation.CreatePhantom import CreatePhantom
-from ....Simulation.Noise import Noise
-from ..ProjectsJP.StaticCT_createSubsetAnimationGif import \
-    StaticCT_createSubsetAnimationGif
-from ..StaticCTHelperFunctions.StaticCTSystemHelperFunctions import \
-    StaticCTSystemHelperFunctions
+from CTBasics.Memory.Allocation import Allocation
+from CTBasics.MultiCore.Parallelization import Parallelization
+from CTBasics.RawData.RawDataHelperFunctions import RawDataHelperFunctions
+from CTBasics.ReadAndWrite.IOHelperFunctions import IOHelperFunctions
+from CTBasics.Reconstruction.Backprojection import Backprojection
+from CTBasics.Reconstruction.Constants import Constants
+from CTBasics.Reconstruction.Convolution import Convolution
+from CTBasics.Reconstruction.ForwardProjection import ForwardProjection
+from CTBasics.Reconstruction.Kernels import Kernels
+from CTBasics.Reconstruction.MoireFilter import MoireFilter
+from CTBasics.Simulation.CreatePhantom import CreatePhantom
+from CTBasics.Simulation.Noise import Noise
+from CTBasics.Projects.StaticCT.StaticCTHelperFunctions import StaticCTIOHelpers, StaticCTSystemHelperFunctions
 
 
 def main(OutputBaseDir=None, ReconType="180", ReconKernel=Kernels.RamLak,
@@ -50,12 +47,15 @@ def main(OutputBaseDir=None, ReconType="180", ReconKernel=Kernels.RamLak,
         raise ValueError(f'Unknown ReconType "{ReconType}". Use "180" or "360".')
 
     Npi = N2pi // 2
-    N = int(N2pi * thetaN / (2 * math.pi))
+    # MATLAB round (half away from zero); the argument is positive.
+    N = int(math.floor(N2pi * thetaN / (2 * math.pi) + 0.5))
 
     dxi = 2 * RM / (M - 1)
     xi0 = -RM - dxi
-    theta0 = 0
     dtheta = thetaN / N
+    # Backprojection uses theta = theta0 + n*dtheta (n=1..N); this aligns the first
+    # reconstructed projection with 0 rad.
+    theta0 = -dtheta
     dT = TRot / N2pi
 
     dx = 2 * RM / Nx
@@ -67,12 +67,13 @@ def main(OutputBaseDir=None, ReconType="180", ReconKernel=Kernels.RamLak,
     TRecon = np.linspace(0, THeart, NRecons + 1)[:-1]
     TLeft = TRecon - TReconInterval / 2
 
-    ThetaArrayArbitrary = StaticCTSystemHelperFunctions.SubsetInterleaving(
-        N2pi, NSubsets, ReconType, 0)
     ThetaArrayLinear = np.linspace(0, 2 * math.pi - dtheta, N2pi)
+    ThetaArrayArbitrary = StaticCTSystemHelperFunctions.SubsetInterleaving_idx(
+        N2pi, NSubsets, ReconType, 0, ThetaArrayLinear)
 
     OutputDir = OutputBaseDir / (
-        f"TemporalIodine_HR{HeartRateBPM}_TRot{round(TRot * 1000)}ms_NSub{NSubsets}"
+        f"TemporalIodine_HR{HeartRateBPM}_TRot{round(TRot * 1000)}ms_N2pi{N2pi}"
+        f"_NSub{NSubsets}"
         f"_NRecons{NRecons}_NScans{NScansPerRecon}_{ReconType}"
         f"_Ipf{IodinePeakFactor:.2f}_Sig{IodineSigmaMin:.2f}-{IodineSigmaMax:.2f}")
     OutputDir.mkdir(parents=True, exist_ok=True)
@@ -91,7 +92,7 @@ def main(OutputBaseDir=None, ReconType="180", ReconKernel=Kernels.RamLak,
     if WriteData and SaveRawRecon:
         IOHelperFunctions.SaveDoubleToFile(
             OutputDir / (f"GroundTruthPhantomMu_HR{HeartRateBPM:.0f}_TRot{TRot:.2f}s"
-                         f"_NSub{NSubsets}_NScans{NScansPerRecon}"),
+                         f"_N2pi{N2pi}_NSub{NSubsets}_NScans{NScansPerRecon}"),
             RawDataHelperFunctions.SimpleLinearizeArray(ReconGT))
 
     print("Forward projection for temporal iodine phases running...")
@@ -222,7 +223,8 @@ def main(OutputBaseDir=None, ReconType="180", ReconKernel=Kernels.RamLak,
 
     if WriteData:
         Results = {
-            "ReconType": ReconType, "NSubsets": NSubsets, "NRecons": NRecons,
+            "ReconType": ReconType, "N2pi": N2pi, "NSubsets": NSubsets,
+            "NRecons": NRecons,
             "NScansPerRecon": NScansPerRecon, "TRecon": TRecon,
             "HeartRateBPM": HeartRateBPM, "MotionEnabled": MotionEnabled,
             "MotionDirectionRad": MotionDirectionRad, "MotionType": MotionType,
@@ -247,8 +249,8 @@ def main(OutputBaseDir=None, ReconType="180", ReconKernel=Kernels.RamLak,
 
             for gif_WC, gif_WW in gifWindows:
                 winTag = f"WC{gif_WC:.0f}_WW{gif_WW:.0f}"
-                stem = (f"HR{HeartRateBPM:.0f}_TRot{TRot:.2f}s_NSub{NSubsets}"
-                        f"_NScans{NScansPerRecon}_{winTag}")
+                stem = (f"HR{HeartRateBPM:.0f}_TRot{TRot:.2f}s_N2pi{N2pi}"
+                        f"_NSub{NSubsets}_NScans{NScansPerRecon}_{winTag}")
                 for Data, name, label in (
                         (ReconHU_Linear, "LinearReconHU", "Linear Recon"),
                         (ReconHU_LinearMinusGT, "LinearReconHU_DiffToGT", "Linear Diff"),
@@ -261,8 +263,8 @@ def main(OutputBaseDir=None, ReconType="180", ReconKernel=Kernels.RamLak,
                         label, gif_WC, gif_WW, gif_fps)
 
         if SaveRawRecon:
-            stem = (f"HR{HeartRateBPM:.0f}_TRot{TRot:.2f}s_NSub{NSubsets}"
-                    f"_NScans{NScansPerRecon}")
+            stem = (f"HR{HeartRateBPM:.0f}_TRot{TRot:.2f}s_N2pi{N2pi}"
+                    f"_NSub{NSubsets}_NScans{NScansPerRecon}")
             for Data, name in ((ReconHU_Linear, "LinearReconHU"),
                                (ReconHU_LinearMinusGT, "LinearReconHU_DiffToGT"),
                                (ReconHU_Arbitrary, "ArbitraryReconHU"),
@@ -274,7 +276,8 @@ def main(OutputBaseDir=None, ReconType="180", ReconKernel=Kernels.RamLak,
 
         IOHelperFunctions.SaveStructToMat(
             OutputDir / "additionalInfo.mat",
-            {"TRecon": TRecon, "ReconType": ReconType, "NSubsets": NSubsets,
+            {"TRecon": TRecon, "ReconType": ReconType, "N2pi": N2pi,
+             "NSubsets": NSubsets,
              "NRecons": NRecons, "NScansPerRecon": NScansPerRecon,
              "ThetaArrayArbitrary": ThetaArrayArbitrary,
              "HeartRateBPM": HeartRateBPM, "MotionEnabled": MotionEnabled,
@@ -283,7 +286,7 @@ def main(OutputBaseDir=None, ReconType="180", ReconKernel=Kernels.RamLak,
              "IodineSigmaMin": IodineSigmaMin, "IodineSigmaMax": IodineSigmaMax})
 
         if isGIF:
-            StaticCT_createSubsetAnimationGif(
+            StaticCTIOHelpers.StaticCT_createSubsetAnimationGif(
                 ThetaArrayArbitrary, ReconType, NSubsets, OutputDir,
                 MaxAngles=100, MaxFrames=100, DelayTime=0.25, Visible=False)
 
@@ -434,3 +437,9 @@ def _PlotTemporalSignal(t, iodineTemporalSignal, TRecon, TLeft, TRight,
         plt.close(fig)
 
     return fig
+
+if __name__ == "__main__":
+    import matplotlib.pyplot as plt
+
+    main()
+    plt.show()

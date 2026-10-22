@@ -1,11 +1,11 @@
 """Scan geometry, scan parameter and descriptor-based setup."""
 
-from .Geometries import BaseScannerGeometry, FanBeam, ParallelBeam, StaticCTBeam
-from .Sampling import AzimuthalSampling, FlyingFocalSpot, FocalSpotSimulationStaticCT
-from .ScanDescriptor import ScanDescriptor
-from .ScannerGeometryTypes import ScannerGeometryTypes
-from .ScanParameter import BaseScanParameter, Sequence, Spiral
-from .ScanTypes import ScanTypes
+from CTBasics.Descriptors.Geometries import BaseScannerGeometry, FanBeam, ParallelBeam, StaticCTBeam
+from CTBasics.Descriptors.Sampling import AzimuthalSampling, FlyingFocalSpot, FocalSpotSimulationStaticCT
+from CTBasics.Descriptors.ScanDescriptor import ScanDescriptor
+from CTBasics.Descriptors.ScannerGeometryTypes import ScannerGeometryTypes
+from CTBasics.Descriptors.ScanParameter import BaseScanParameter, Sequence, Spiral
+from CTBasics.Descriptors.ScanTypes import ScanTypes
 
 __all__ = [
     "AzimuthalSampling",

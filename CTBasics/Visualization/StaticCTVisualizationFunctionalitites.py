@@ -5,12 +5,12 @@ and the tests can inspect the plotted geometry instead of only looking at a wind
 """
 import numpy as np
 
-from ..Descriptors.Geometries.StaticCTBeam import StaticCTBeam
-from ..Descriptors.Sampling.FocalSpotSimulationStaticCT import FocalSpotSimulationStaticCT
-from ..Descriptors.ScanDescriptor import ScanDescriptor
-from ..Descriptors.ScannerGeometryTypes import ScannerGeometryTypes
-from ..Descriptors.ScanTypes import ScanTypes
-from ..Reconstruction.ForwardProjection import ForwardProjection
+from CTBasics.Descriptors.Geometries.StaticCTBeam import StaticCTBeam
+from CTBasics.Descriptors.Sampling.FocalSpotSimulationStaticCT import FocalSpotSimulationStaticCT
+from CTBasics.Descriptors.ScanDescriptor import ScanDescriptor
+from CTBasics.Descriptors.ScannerGeometryTypes import ScannerGeometryTypes
+from CTBasics.Descriptors.ScanTypes import ScanTypes
+from CTBasics.Reconstruction.ForwardProjection import ForwardProjection
 
 
 def _Figure(name, projection=None):
@@ -31,14 +31,14 @@ def _Axes3D(name):
     return figure, axes
 
 
-class VisualizationTests:
+class StaticCTVisualizationFunctionalitites:
     @staticmethod
     def DemoAll():
         """Runs every demo figure in the order of the MATLAB script."""
-        VisualizationTests.ShowRebinVariables2D()
-        VisualizationTests.ShowRebinnedGeometry3D()
-        VisualizationTests.ShowStaticCTGeometry3D()
-        VisualizationTests.ShowStaticCTCollimation3D()
+        StaticCTVisualizationFunctionalitites.ShowRebinVariables2D()
+        StaticCTVisualizationFunctionalitites.ShowRebinnedGeometry3D()
+        StaticCTVisualizationFunctionalitites.ShowStaticCTGeometry3D()
+        StaticCTVisualizationFunctionalitites.ShowStaticCTCollimation3D()
 
     @staticmethod
     def ShowRingSketch3D():
@@ -140,9 +140,9 @@ class VisualizationTests:
     def ShowStaticCTGeometry3D(scanDescriptorOrGeometry=None):
         """Source ring, detector surface and the two collimator rings of a static CT."""
         if scanDescriptorOrGeometry is None:
-            geo = VisualizationTests.CreateDefaultStaticCTDescriptor().Geometry
+            geo = StaticCTVisualizationFunctionalitites.CreateDefaultStaticCTDescriptor().Geometry
         else:
-            geo = VisualizationTests.ResolveStaticCTGeometry(scanDescriptorOrGeometry)
+            geo = StaticCTVisualizationFunctionalitites.ResolveStaticCTGeometry(scanDescriptorOrGeometry)
 
         delta = geo.delta0 + np.arange(1, geo.MDelta + 1) * geo.dDelta
         zRows = geo.s0 + np.arange(1, geo.Ns + 1) * geo.ds
@@ -190,13 +190,13 @@ class VisualizationTests:
         Returns (collimationOfOneProjection, detectorImage).
         """
         if scanDescriptor is None:
-            scanDescriptor = VisualizationTests.CreateDefaultStaticCTDescriptor()
+            scanDescriptor = StaticCTVisualizationFunctionalitites.CreateDefaultStaticCTDescriptor()
         if projectionAngle is None:
             projectionAngle = np.pi / 2
         if focalSpotSamples is None:
             focalSpotSamples = FocalSpotSimulationStaticCT.CalculateFocalSpotSamplingPositions()
 
-        geo = VisualizationTests.ResolveStaticCTGeometry(scanDescriptor)
+        geo = StaticCTVisualizationFunctionalitites.ResolveStaticCTGeometry(scanDescriptor)
         collimationOfOneProjection = None
         detectorImage = None
 
@@ -206,7 +206,7 @@ class VisualizationTests:
             )
             detectorImage = np.asarray(collimationOfOneProjection).reshape(geo.Ns, geo.MDelta)
 
-        VisualizationTests.ShowStaticCTCollimation3DFromComputedData(
+        StaticCTVisualizationFunctionalitites.ShowStaticCTCollimation3DFromComputedData(
             scanDescriptor, projectionAngle, focalSpotSamples, collimationOfOneProjection,
             "StaticCT Collimator and Detector Illumination (3D)"
         )
@@ -220,7 +220,7 @@ class VisualizationTests:
                                                   plotTitle=None):
         """Draws the single-ring collimator and colours the detector by the illumination."""
         if scanDescriptor is None:
-            scanDescriptor = VisualizationTests.CreateDefaultStaticCTDescriptor()
+            scanDescriptor = StaticCTVisualizationFunctionalitites.CreateDefaultStaticCTDescriptor()
         if projectionAngle is None:
             projectionAngle = np.pi / 2
         if focalSpotSamples is None:
@@ -228,7 +228,7 @@ class VisualizationTests:
         if plotTitle is None:
             plotTitle = "StaticCT Collimator and Detector Illumination (3D)"
 
-        geo = VisualizationTests.ResolveStaticCTGeometry(scanDescriptor)
+        geo = StaticCTVisualizationFunctionalitites.ResolveStaticCTGeometry(scanDescriptor)
         focalSpotSamples = np.atleast_2d(np.asarray(focalSpotSamples, dtype=float))
 
         hasIllumination = collimationOfOneProjection is not None
@@ -271,7 +271,7 @@ class VisualizationTests:
                                                       LeafConfig=None, plotTitle=None):
         """Same view as the single-ring variant but with one collimator leaf per segment."""
         if scanDescriptor is None:
-            scanDescriptor = VisualizationTests.CreateDefaultStaticCTDescriptor()
+            scanDescriptor = StaticCTVisualizationFunctionalitites.CreateDefaultStaticCTDescriptor()
         if projectionAngle is None:
             projectionAngle = np.pi / 2
         if focalSpotSamples is None:
@@ -281,7 +281,7 @@ class VisualizationTests:
         if plotTitle is None:
             plotTitle = "MultiLeaf static CT collimation"
 
-        geo = VisualizationTests.ResolveStaticCTGeometry(scanDescriptor)
+        geo = StaticCTVisualizationFunctionalitites.ResolveStaticCTGeometry(scanDescriptor)
         focalSpotSamples = np.atleast_2d(np.asarray(focalSpotSamples, dtype=float))
 
         hasIllumination = collimationOfOneProjection is not None

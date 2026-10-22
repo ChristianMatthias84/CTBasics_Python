@@ -1,8 +1,18 @@
 import numpy as np
 
-from ..Memory.Allocation import Allocation
+from CTBasics.Memory.Allocation import Allocation
 
 _Generator = np.random.default_rng()
+
+
+def rng(seed, generator="twister"):
+    """MATLAB rng(seed, 'twister'): reseeds the generator shared by all Noise methods.
+
+    numpy's stream differs from MATLAB's Mersenne twister, so the draws are reproducible
+    in Python but not bitwise equal to MATLAB; ``generator`` is accepted for parity only.
+    """
+    global _Generator
+    _Generator = np.random.default_rng(seed)
 
 
 def _Poisson(expectation):

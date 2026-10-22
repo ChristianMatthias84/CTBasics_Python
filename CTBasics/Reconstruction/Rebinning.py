@@ -1,12 +1,13 @@
 from pathlib import Path
 
+import numba
 import numpy as np
 
-from ..Descriptors.ScannerGeometryTypes import ScannerGeometryTypes
-from ..Descriptors.ScanTypes import ScanTypes
-from ..Memory.Allocation import Allocation
-from ..Memory.Precision import Precision
-from ..ReadAndWrite.IOHelperFunctions import IOHelperFunctions
+from CTBasics.Descriptors.ScannerGeometryTypes import ScannerGeometryTypes
+from CTBasics.Descriptors.ScanTypes import ScanTypes
+from CTBasics.Memory.Allocation import Allocation
+from CTBasics.Memory.Precision import Precision
+from CTBasics.ReadAndWrite.IOHelperFunctions import IOHelperFunctions
 
 
 def _Regroup(Projections, M, Ns, N):
@@ -17,6 +18,66 @@ def _Regroup(Projections, M, Ns, N):
 def _Linearize(RebinnedProjections, Ns, Npar, Mpar):
     """Interleaves the per-row results back into the (n, ns, m) sinogram order."""
     return RebinnedProjections.reshape(Ns, Npar, Mpar).transpose(1, 0, 2).ravel()
+
+
+@numba.njit(parallel=True, cache=True)
+def _AzimuthalRebinning(p_alpha_beta, N, theta, beta, alpha0, dalpha):
+    """p(alpha, beta) -> p(theta, beta); views outside the scan stay 0."""
+    MBeta = p_alpha_beta.shape[1]
+    p_theta_beta = np.zeros((theta.size, MBeta))
+
+    for n in numba.prange(theta.size):
+        for m in range(MBeta):
+            n_alpha_real = (-beta[m] + theta[n] - alpha0) / dalpha
+            n_alpha = np.floor(n_alpha_real)
+            if 1 <= n_alpha < N:
+                w = n_alpha_real - n_alpha
+                k = int(n_alpha)
+                p_theta_beta[n, m] = (1 - w) * p_alpha_beta[k - 1, m] + w * p_alpha_beta[k, m]
+
+    return p_theta_beta
+
+
+@numba.njit(parallel=True, cache=True)
+def _RadialRebinning(p_theta_beta, m_beta, w, valid):
+    """p(theta, beta) -> p(theta, xi) with per-channel indices and weights; invalid channels stay 0."""
+    NPar = p_theta_beta.shape[0]
+    p_theta_xi = np.zeros((NPar, m_beta.size))
+
+    for n in numba.prange(NPar):
+        for m in range(m_beta.size):
+            if valid[m]:
+                k = m_beta[m]
+                p_theta_xi[n, m] = (1 - w[m]) * p_theta_beta[n, k - 1] + w[m] * p_theta_beta[n, k]
+
+    return p_theta_xi
+
+
+@numba.njit(parallel=True, cache=True)
+def _RingResampling(p_alpha_delta, N, alpha, betaDash, delta0, dDelta):
+    """Resamples the closed source ring onto the betaDash raster; the delta index wraps around."""
+    MDelta = p_alpha_delta.shape[1]
+    p_alpha_deltaDash = np.empty((N, betaDash.size))
+
+    for n in numba.prange(N):
+        for m in range(betaDash.size):
+            m_delta_real = (alpha[n] + np.pi / 2 + betaDash[m] - delta0) / dDelta
+            m_delta_floor = np.floor(m_delta_real)
+            w = m_delta_real - m_delta_floor
+
+            m_delta = int(m_delta_floor)
+            if m_delta <= 0:
+                m_delta = MDelta - abs(m_delta) % MDelta
+            else:
+                m_delta = (m_delta - 1) % MDelta + 1
+            m_delta_plus1 = (m_delta + 1) % MDelta
+            if m_delta_plus1 == 0:
+                m_delta_plus1 = MDelta
+
+            p_alpha_deltaDash[n, m] = ((1 - w) * p_alpha_delta[n, m_delta - 1]
+                                       + w * p_alpha_delta[n, m_delta_plus1 - 1])
+
+    return p_alpha_deltaDash
 
 
 def _CachedFilename(ScanDescriptor, suffix):
@@ -77,20 +138,8 @@ class Rebinning:
 
         # Azimuthal rebinning: p(alpha, beta) -> p(theta, beta)
         theta = theta0 + np.arange(1, NPar + 1) * dtheta
-        n_alpha_real = (-beta[None, :] + theta[:, None] - alpha0) / dalpha
-        n_alpha = np.floor(n_alpha_real).astype(np.int64)
-        w = n_alpha_real - n_alpha
-        valid = (n_alpha >= 1) & (n_alpha < NFan)
-
-        safe = np.where(valid, n_alpha, 1)
-        column = np.broadcast_to(np.arange(MFan), safe.shape)
-
         p_theta_beta = Allocation.zeros(NPar, MFan)
-        p_theta_beta[:] = np.where(
-            valid,
-            (1 - w) * p_alpha_beta[safe - 1, column] + w * p_alpha_beta[safe, column],
-            0.0,
-        )
+        p_theta_beta[:] = _AzimuthalRebinning(p_alpha_beta, NFan, theta, beta, alpha0, dalpha)
 
         # Radial rebinning: p(theta, beta) -> p(theta, xi)
         xi = xi0 + np.arange(1, MPar + 1) * dxi
@@ -111,11 +160,7 @@ class Rebinning:
             w = (beta[safe - 1] - beta_real) / (beta[safe - 1] - beta[safe])
 
         p_theta_xi = Allocation.zeros(NPar * MPar)
-        p_theta_xi[:] = np.where(
-            valid[None, :],
-            (1 - w)[None, :] * p_theta_beta[:, safe - 1] + w[None, :] * p_theta_beta[:, safe],
-            0.0,
-        ).ravel()
+        p_theta_xi[:] = _RadialRebinning(p_theta_beta, safe, w, valid).ravel()
 
         return p_theta_xi
 
@@ -213,37 +258,13 @@ class Rebinning:
         alpha = alpha0 + np.arange(1, N + 1) * dalpha
         betaDash = betaDash0 + np.arange(1, MbetaDash + 1) * dbetaDash
 
-        m_delta_real = (alpha[:, None] + np.pi / 2 + betaDash[None, :] - delta0) / dDelta
-        m_delta = np.floor(m_delta_real).astype(np.int64)
-        w = m_delta_real - m_delta
-
-        m_delta = np.where(m_delta <= 0,
-                           MDelta - np.abs(m_delta) % MDelta,
-                           (m_delta - 1) % MDelta + 1)
-        m_delta_plus1 = (m_delta + 1) % MDelta
-        m_delta_plus1 = np.where(m_delta_plus1 == 0, MDelta, m_delta_plus1)
-
-        row = np.arange(N)[:, None]
-        p_alpha_deltaDash = ((1 - w) * p_alpha_delta[row, m_delta - 1]
-                             + w * p_alpha_delta[row, m_delta_plus1 - 1])
+        p_alpha_deltaDash = _RingResampling(p_alpha_delta, N, alpha, betaDash, delta0, dDelta)
 
         # 2. Azimuthal rebinning: p(alpha, betaDash) -> p(theta, betaDash)
         theta = theta0 + np.arange(1, NPar + 1) * dtheta
         beta = np.arctan(np.sin(betaDash) * RD / (np.cos(betaDash) * RD + RF))
 
-        n_alpha_real = (-beta[None, :] + theta[:, None] - alpha0) / dalpha
-        n_alpha = np.floor(n_alpha_real).astype(np.int64)
-        w = n_alpha_real - n_alpha
-        valid = (n_alpha >= 1) & (n_alpha < N)
-
-        safe = np.where(valid, n_alpha, 1)
-        column = np.broadcast_to(np.arange(MbetaDash), safe.shape)
-
-        p_theta_beta = np.where(
-            valid,
-            (1 - w) * p_alpha_deltaDash[safe - 1, column] + w * p_alpha_deltaDash[safe, column],
-            0.0,
-        )
+        p_theta_beta = _AzimuthalRebinning(p_alpha_deltaDash, N, theta, beta, alpha0, dalpha)
 
         # 3. Radial rebinning: p(theta, betaDash) -> p(theta, xi)
         xi = xi0 + np.arange(1, MPar + 1) * dxi
@@ -261,14 +282,9 @@ class Rebinning:
         w = m_betaDash_real - m_betaDash
 
         valid = (m_betaDash >= 1) & (m_betaDash < MbetaDash)
-        safe = np.where(valid, m_betaDash, 1)
 
         p_theta_xi = Allocation.zeros(NPar * MPar)
-        p_theta_xi[:] = np.where(
-            valid[None, :],
-            (1 - w)[None, :] * p_theta_beta[:, safe - 1] + w[None, :] * p_theta_beta[:, safe],
-            0.0,
-        ).ravel()
+        p_theta_xi[:] = _RadialRebinning(p_theta_beta, m_betaDash, w, valid).ravel()
 
         return p_theta_xi
 

@@ -1,12 +1,12 @@
 """Projection, rebinning, convolution, kernels and backprojection."""
 
-from .Backprojection import Backprojection
-from .Constants import Constants
-from .Convolution import Convolution
-from .ForwardProjection import ForwardProjection
-from .Kernels import Kernels
-from .MoireFilter import MoireFilter
-from .Rebinning import Rebinning
+from CTBasics.Reconstruction.Backprojection import Backprojection
+from CTBasics.Reconstruction.Constants import Constants
+from CTBasics.Reconstruction.Convolution import Convolution
+from CTBasics.Reconstruction.ForwardProjection import ForwardProjection
+from CTBasics.Reconstruction.Kernels import Kernels
+from CTBasics.Reconstruction.MoireFilter import MoireFilter
+from CTBasics.Reconstruction.Rebinning import Rebinning
 
 __all__ = [
     "Backprojection",

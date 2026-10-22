@@ -1,5 +1,5 @@
 """Image resampling helpers."""
 
-from .ImageManipulation import ImageManipulation
+from CTBasics.ImageManipulation.ImageManipulation import ImageManipulation
 
 __all__ = ["ImageManipulation"]

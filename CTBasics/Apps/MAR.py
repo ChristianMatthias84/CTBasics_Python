@@ -1,12 +1,12 @@
 import numpy as np
 
-from ..Memory.Allocation import Allocation
-from ..ReadAndWrite.IOHelperFunctions import IOHelperFunctions
-from ..Reconstruction.Backprojection import Backprojection
-from ..Reconstruction.Constants import Constants
-from ..Reconstruction.Convolution import Convolution
-from ..Reconstruction.ForwardProjection import ForwardProjection
-from ..Reconstruction.Kernels import Kernels
+from CTBasics.Memory.Allocation import Allocation
+from CTBasics.ReadAndWrite.IOHelperFunctions import IOHelperFunctions
+from CTBasics.Reconstruction.Backprojection import Backprojection
+from CTBasics.Reconstruction.Constants import Constants
+from CTBasics.Reconstruction.Convolution import Convolution
+from CTBasics.Reconstruction.ForwardProjection import ForwardProjection
+from CTBasics.Reconstruction.Kernels import Kernels
 
 
 class MAR:
@@ -36,25 +36,31 @@ class MAR:
 
     def Apply(self):
         """Runs the nine NMAR steps and writes every intermediate result to the output folder."""
+        Outputdirectory = IOHelperFunctions().GlobalOutputFolderPath
+
+        def Save(volume, name):
+            # MATLAB: fopen([Outputdirectory, name]); fwrite(fileID, volume, 'double')
+            IOHelperFunctions.SaveDoubleToFile(Outputdirectory / name, volume)
+
         Projections = ForwardProjection.RayDrivenForwProjParCartesianMultiple(
             self.x0, self.dx, self.Nx, self.y0, self.dy, self.Ny,
             self.Input * Constants.MuW / 1000,
             self.theta0, self.dtheta, self.N180, self.xi0, self.dxi, self.M
         )
-        IOHelperFunctions.Save(Projections, "Projections")
+        Save(Projections, "Projections")
 
         MetalImage = self.ThresholdMetalImage()
-        IOHelperFunctions.Save(MetalImage, "MetalImage")
+        Save(MetalImage, "MetalImage")
 
         MetalProjections = ForwardProjection.RayDrivenForwProjParCartesianMultiple(
             self.x0, self.dx, self.Nx, self.y0, self.dy, self.Ny,
             MetalImage * Constants.MuW / 1000,
             self.theta0, self.dtheta, self.N180, self.xi0, self.dxi, self.M
         )
-        IOHelperFunctions.Save(MetalProjections, "MetalProjections")
+        Save(MetalProjections, "MetalProjections")
 
         InterolatedProjections = self.MetalTraceInterpolation(Projections, MetalProjections)
-        IOHelperFunctions.Save(InterolatedProjections, "InterolatedProjections")
+        Save(InterolatedProjections, "InterolatedProjections")
 
         Kernel = Kernels.RamLakKernelSD(self.M, self.dxi)
         InterolatedProjections = Convolution.ConvolveSinogram(
@@ -65,22 +71,22 @@ class MAR:
             InterolatedProjections, self.x0, self.dx, self.Nx, self.y0, self.dy, self.Ny
         )
         MARResult = MARResult / Constants.MuW * 1000
-        IOHelperFunctions.Save(MARResult, "MARResult")
+        Save(MARResult, "MARResult")
 
         PriorImage = self.CreatePriorImage(MARResult)
-        IOHelperFunctions.Save(PriorImage, "PriorImage")
+        Save(PriorImage, "PriorImage")
 
         PriorSinogram = ForwardProjection.RayDrivenForwProjParCartesianMultiple(
             self.x0, self.dx, self.Nx, self.y0, self.dy, self.Ny,
             PriorImage * Constants.MuW / 1000,
             self.theta0, self.dtheta, self.N180, self.xi0, self.dxi, self.M
         )
-        IOHelperFunctions.Save(PriorSinogram, "PriorSinogram")
+        Save(PriorSinogram, "PriorSinogram")
 
         InterolatedProjections = self.NoramlizedMetalTraceInterpolation(
             Projections, MetalProjections, PriorSinogram
         )
-        IOHelperFunctions.Save(InterolatedProjections, "InterolatedProjections")
+        Save(InterolatedProjections, "InterolatedProjections")
 
         InterolatedProjections = Convolution.ConvolveSinogram(
             InterolatedProjections, Kernel, self.M, self.N180, self.dxi
@@ -90,7 +96,7 @@ class MAR:
             InterolatedProjections, self.x0, self.dx, self.Nx, self.y0, self.dy, self.Ny
         )
         MARResult = MARResult / Constants.MuW * 1000
-        IOHelperFunctions.Save(MARResult, "iMARResult")
+        Save(MARResult, "iMARResult")
 
         return MARResult
 

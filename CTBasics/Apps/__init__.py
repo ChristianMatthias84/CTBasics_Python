@@ -1,5 +1,5 @@
 """Higher-level, user-facing entry points."""
 
-from .MAR import MAR
+from CTBasics.Apps.MAR import MAR
 
 __all__ = ["MAR"]

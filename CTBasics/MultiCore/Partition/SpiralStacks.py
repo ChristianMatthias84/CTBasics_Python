@@ -1,9 +1,9 @@
 import numpy as np
 
-from ...Memory.Allocation import Allocation
-from ...Memory.Precision import Precision
-from ..CPU import CPU
-from ..RAM import RAM
+from CTBasics.Memory.Allocation import Allocation
+from CTBasics.Memory.Precision import Precision
+from CTBasics.MultiCore.CPU import CPU
+from CTBasics.MultiCore.RAM import RAM
 
 _BYTES = {"double": 8, "single": 4}
 

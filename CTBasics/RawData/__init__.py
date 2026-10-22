@@ -3,8 +3,8 @@
 The external Siemens readers (readXACB, TFS toolchain) remain intentionally deferred.
 """
 
-from .RawDataHelperFunctions import RawDataHelperFunctions
-from .RawDataScanDescriptor import RawDataScanDescriptor
-from .ReadRawDataFunctions import ReadRawDataFunctions
+from CTBasics.RawData.RawDataHelperFunctions import RawDataHelperFunctions
+from CTBasics.RawData.RawDataScanDescriptor import RawDataScanDescriptor
+from CTBasics.RawData.ReadRawDataFunctions import ReadRawDataFunctions
 
 __all__ = ["RawDataHelperFunctions", "RawDataScanDescriptor", "ReadRawDataFunctions"]

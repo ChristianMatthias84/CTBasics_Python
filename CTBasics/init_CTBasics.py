@@ -7,7 +7,7 @@ the optional TFS toolbox path used by the raw-data projects.
 """
 from pathlib import Path
 
-from .ReadAndWrite.IOHelperFunctions import IOHelperFunctions
+from CTBasics.ReadAndWrite.IOHelperFunctions import IOHelperFunctions
 
 # MATLAB guards the TFS path setup with this flag; it is only needed to load raw data.
 IncludeRawDataProjects = True

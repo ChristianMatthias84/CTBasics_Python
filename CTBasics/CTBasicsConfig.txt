@@ -1,6 +1,6 @@
 %global folder of the repository
-E:\CTPhysics_TFS\MAIN\Tools\Users\HofmannChristian\Matlab\siemens.CTBasics
+D:\Repos\AI_Coding_Master
 %Output directory
 C:\Temp\Matlab
 %path to TFS matlab functions for CT
-C:\Users\z002h4up\source\Workspaces\CTPHYSICS\MAIN\Tools\matlab
+D:\Repos\AI_Coding_Master\Matlab\siemens.Matlab_Libraries_PSC

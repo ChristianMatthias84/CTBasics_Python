@@ -6,19 +6,19 @@ so `RawDataScanDescriptor.LoadFromFile` raises until that is available.
 """
 import numpy as np
 
-from ..Descriptors.Geometries.ParallelBeam import ParallelBeam
-from ..Descriptors.Sampling.FlyingFocalSpot import FlyingFocalSpot
-from ..Descriptors.ScanTypes import ScanTypes
-from ..Descriptors.Volumes.Reconstruction import Reconstruction
-from ..Memory.Precision import Precision
-from ..RawData.RawDataHelperFunctions import RawDataHelperFunctions
-from ..RawData.RawDataScanDescriptor import RawDataScanDescriptor
-from ..ReadAndWrite.IOHelperFunctions import IOHelperFunctions
-from ..Reconstruction.Backprojection import Backprojection
-from ..Reconstruction.Constants import Constants
-from ..Reconstruction.Convolution import Convolution
-from ..Reconstruction.Kernels import Kernels
-from ..Reconstruction.Rebinning import Rebinning
+from CTBasics.Descriptors.Geometries.ParallelBeam import ParallelBeam
+from CTBasics.Descriptors.Sampling.FlyingFocalSpot import FlyingFocalSpot
+from CTBasics.Descriptors.ScanTypes import ScanTypes
+from CTBasics.Descriptors.Volumes.Reconstruction import Reconstruction
+from CTBasics.Memory.Precision import Precision
+from CTBasics.RawData.RawDataHelperFunctions import RawDataHelperFunctions
+from CTBasics.RawData.RawDataScanDescriptor import RawDataScanDescriptor
+from CTBasics.ReadAndWrite.IOHelperFunctions import IOHelperFunctions
+from CTBasics.Reconstruction.Backprojection import Backprojection
+from CTBasics.Reconstruction.Constants import Constants
+from CTBasics.Reconstruction.Convolution import Convolution
+from CTBasics.Reconstruction.Kernels import Kernels
+from CTBasics.Reconstruction.Rebinning import Rebinning
 
 
 def main(filename, Reconkernel=Kernels.RamLak, ApplyBetaOffset=False, isSpectral=False,

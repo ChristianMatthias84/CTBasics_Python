@@ -6,18 +6,18 @@ import math
 
 import numpy as np
 
-from .....LecturesAndTestScripts.CTRecon101 import _Save
-from .....Preprocessing.WBHC import WBHC
-from .....ReadAndWrite.IOHelperFunctions import IOHelperFunctions
-from .....Reconstruction.Backprojection import Backprojection
-from .....Reconstruction.Constants import Constants
-from .....Reconstruction.Convolution import Convolution
-from .....Reconstruction.ForwardProjection import ForwardProjection
-from .....Reconstruction.Kernels import Kernels
-from .....Reconstruction.Rebinning import Rebinning
-from .....Simulation.CreatePhantom import CreatePhantom
-from .....Simulation.Noise import Noise
-from .....Simulation.Spectra import Spectra
+from CTBasics.LecturesAndTestScripts.CTRecon101 import _Save
+from CTBasics.Preprocessing.WBHC import WBHC
+from CTBasics.ReadAndWrite.IOHelperFunctions import IOHelperFunctions
+from CTBasics.Reconstruction.Backprojection import Backprojection
+from CTBasics.Reconstruction.Constants import Constants
+from CTBasics.Reconstruction.Convolution import Convolution
+from CTBasics.Reconstruction.ForwardProjection import ForwardProjection
+from CTBasics.Reconstruction.Kernels import Kernels
+from CTBasics.Reconstruction.Rebinning import Rebinning
+from CTBasics.Simulation.CreatePhantom import CreatePhantom
+from CTBasics.Simulation.Noise import Noise
+from CTBasics.Simulation.Spectra import Spectra
 
 
 def main(Outputdirectory=None, ShowFigures=False, Reconkernel=Kernels.RamLak,
@@ -130,7 +130,7 @@ def main(Outputdirectory=None, ShowFigures=False, Reconkernel=Kernels.RamLak,
     _Save(Outputdirectory, "ReconstructionHU", ReconstructedImageHU)
 
     if ShowFigures:
-        from .....LecturesAndTestScripts.CTRecon102 import _ShowFigures
+        from CTBasics.LecturesAndTestScripts.CTRecon102 import _ShowFigures
         _ShowFigures(Voxelphantom, Nxsim, Nysim, FanProjections, MFan, NFan,
                      RebinnedProjections, M, Npar, Kernel, Projections,
                      ReconstructedImage, Nx, Ny)
@@ -153,3 +153,9 @@ def main(Outputdirectory=None, ShowFigures=False, Reconkernel=Kernels.RamLak,
                      "xi0": xi0, "dxi": dxi,
                      "x0": x0, "dx": dx, "Nx": Nx, "y0": y0, "dy": dy, "Ny": Ny},
     }
+
+if __name__ == "__main__":
+    import matplotlib.pyplot as plt
+
+    main(ShowFigures=True)
+    plt.show()

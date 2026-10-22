@@ -6,26 +6,26 @@ reproduces the MATLAB loop.
 """
 import numpy as np
 
-from ..Descriptors.Geometries.ParallelBeam import ParallelBeam
-from ..Descriptors.ScanDescriptor import ScanDescriptor
-from ..Descriptors.ScannerGeometryTypes import ScannerGeometryTypes
-from ..Descriptors.ScanTypes import ScanTypes
-from ..Descriptors.Volumes.Reconstruction import Reconstruction
-from ..Descriptors.Volumes.Simulation import Simulation
-from ..ImageManipulation.ImageManipulation import ImageManipulation
-from ..Preprocessing.WBHC import WBHC as WBHCorrection
-from ..ReadAndWrite.IOHelperFunctions import IOHelperFunctions
-from ..Reconstruction.Backprojection import Backprojection
-from ..Reconstruction.Constants import Constants
-from ..Reconstruction.Convolution import Convolution
-from ..Reconstruction.ForwardProjection import ForwardProjection
-from ..Reconstruction.Kernels import Kernels
-from ..Reconstruction.MoireFilter import MoireFilter
-from ..Reconstruction.Rebinning import Rebinning
-from ..Simulation.CreatePhantom import CreatePhantom
-from ..Simulation.Noise import Noise
-from ..Simulation.Spectra import Spectra
-from .CTRecon101 import _Save
+from CTBasics.Descriptors.Geometries.ParallelBeam import ParallelBeam
+from CTBasics.Descriptors.ScanDescriptor import ScanDescriptor
+from CTBasics.Descriptors.ScannerGeometryTypes import ScannerGeometryTypes
+from CTBasics.Descriptors.ScanTypes import ScanTypes
+from CTBasics.Descriptors.Volumes.Reconstruction import Reconstruction
+from CTBasics.Descriptors.Volumes.Simulation import Simulation
+from CTBasics.ImageManipulation.ImageManipulation import ImageManipulation
+from CTBasics.Preprocessing.WBHC import WBHC as WBHCorrection
+from CTBasics.ReadAndWrite.IOHelperFunctions import IOHelperFunctions
+from CTBasics.Reconstruction.Backprojection import Backprojection
+from CTBasics.Reconstruction.Constants import Constants
+from CTBasics.Reconstruction.Convolution import Convolution
+from CTBasics.Reconstruction.ForwardProjection import ForwardProjection
+from CTBasics.Reconstruction.Kernels import Kernels
+from CTBasics.Reconstruction.MoireFilter import MoireFilter
+from CTBasics.Reconstruction.Rebinning import Rebinning
+from CTBasics.Simulation.CreatePhantom import CreatePhantom
+from CTBasics.Simulation.Noise import Noise
+from CTBasics.Simulation.Spectra import Spectra
+from CTBasics.LecturesAndTestScripts.CTRecon101 import _Save
 
 
 def main(aScanType=ScanTypes.Spiral, Outputdirectory=None, ShowFigures=False,
@@ -74,9 +74,9 @@ def main(aScanType=ScanTypes.Spiral, Outputdirectory=None, ShowFigures=False,
         V_HU = ImageManipulation.Resample3D(
             np.asarray(V_HU, dtype=float), aSimVol.Nxsim, aSimVol.Nysim, aSimVol.Nzsim
         )
-        # Slices are stacked transposed, matching the MATLAB `Slice(:)'` concatenation.
+        # MATLAB `Slice = V(:,:,nz)'; Slice(:)'` is the row-major flattening of each slice.
         Voxelphantom = np.concatenate(
-            [V_HU[:, :, nz].T.ravel() for nz in range(aSimVol.Nzsim)]
+            [V_HU[:, :, nz].ravel() for nz in range(aSimVol.Nzsim)]
         )
         Voxelphantom = (Voxelphantom + 1000) * Constants.MuW / 1000
 

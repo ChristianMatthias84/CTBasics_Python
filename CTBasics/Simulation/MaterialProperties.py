@@ -2,9 +2,9 @@ from pathlib import Path
 
 import numpy as np
 
-from ..Memory.Allocation import Allocation
-from ..Reconstruction.Constants import Constants
-from .Materials import Materials
+from CTBasics.Memory.Allocation import Allocation
+from CTBasics.Reconstruction.Constants import Constants
+from CTBasics.Simulation.Materials import Materials
 
 _COEFFS = Path(__file__).parent / "attenuationcoeffs"
 

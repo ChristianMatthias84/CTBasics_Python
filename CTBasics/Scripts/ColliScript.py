@@ -5,13 +5,15 @@ functions map to module level functions here.
 """
 import numpy as np
 
-from ..Descriptors.Sampling.FocalSpotSimulationStaticCT import FocalSpotSimulationStaticCT
-from ..Descriptors.ScanDescriptor import ScanDescriptor
-from ..Descriptors.ScannerGeometryTypes import ScannerGeometryTypes
-from ..Descriptors.ScanTypes import ScanTypes
-from ..LecturesAndTestScripts.CTRecon101 import _Save
-from ..Reconstruction.ForwardProjection import ForwardProjection
-from ..Visualization.VisualizationTests import VisualizationTests
+from CTBasics.Descriptors.Sampling.FocalSpotSimulationStaticCT import FocalSpotSimulationStaticCT
+from CTBasics.Descriptors.ScanDescriptor import ScanDescriptor
+from CTBasics.Descriptors.ScannerGeometryTypes import ScannerGeometryTypes
+from CTBasics.Descriptors.ScanTypes import ScanTypes
+from CTBasics.LecturesAndTestScripts.CTRecon101 import _Save
+from CTBasics.Reconstruction.ForwardProjection import ForwardProjection
+from CTBasics.Visualization.StaticCTVisualizationFunctionalitites import (
+    StaticCTVisualizationFunctionalitites,
+)
 
 
 def ColliScript(mode="StandardCollimator", Outputdirectory=None, ShowFigures=False,
@@ -54,7 +56,7 @@ def RunLegacyCollimatorSingleDirectionTest(aScanDescriptor, Outputdirectory=None
 
     if ShowFigures:
         _ShowCollimation(aImage, "Legacy ring-based static CT collimation")
-        VisualizationTests.ShowStaticCTCollimation3DFromComputedData(
+        StaticCTVisualizationFunctionalitites.ShowStaticCTCollimation3DFromComputedData(
             aScanDescriptor, np.pi / 2, focalspotsamples, CollimationOfOneProjection,
             "Legacy ring-based static CT collimation"
         )
@@ -84,7 +86,7 @@ def RunLeafCollimatorSingleDirectionTest(aScanDescriptor, Outputdirectory=None,
 
     if ShowFigures:
         _ShowCollimation(aImage, "Leaf-based static CT collimation")
-        VisualizationTests.ShowStaticCTCollimation3DFromComputedDataLeaf(
+        StaticCTVisualizationFunctionalitites.ShowStaticCTCollimation3DFromComputedDataLeaf(
             aScanDescriptor, alpha, focalspotsamples, CollimationOfOneProjection,
             LeafConfig, "MultiLeaf static CT collimation"
         )

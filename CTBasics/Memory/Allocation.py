@@ -1,6 +1,6 @@
 import numpy as np
 
-from .Precision import Precision
+from CTBasics.Memory.Precision import Precision
 
 _DTYPES = {"double": np.float64, "single": np.float32}
 

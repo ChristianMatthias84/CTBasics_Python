@@ -1,5 +1,5 @@
 """Geometry and imaging plots."""
 
-from .VisualizationTests import VisualizationTests
+from CTBasics.Visualization.StaticCTVisualizationFunctionalitites import StaticCTVisualizationFunctionalitites
 
-__all__ = ["VisualizationTests"]
+__all__ = ["StaticCTVisualizationFunctionalitites"]

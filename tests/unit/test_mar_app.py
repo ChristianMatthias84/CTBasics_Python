@@ -117,15 +117,22 @@ def test_normalized_interpolation_is_a_no_op_for_a_perfect_prior(geometry):
 
 
 def test_apply_reduces_the_metal_streaks(geometry, tmp_path, monkeypatch):
-    from CTBasics.ReadAndWrite.IOHelperFunctions import IOHelperFunctions
-
-    monkeypatch.setattr(IOHelperFunctions, "Save", staticmethod(lambda *args, **kwargs: None))
+    output = tmp_path / "out"
+    output.mkdir()
+    (tmp_path / "Data").mkdir()
+    (tmp_path / "CTBasicsConfig.txt").write_text(f"#\n{tmp_path}\n#\n{output}\n#\n\n")
+    monkeypatch.setenv("CTBASICS_CONFIG", str(tmp_path))
 
     mar = _MAR(geometry)
     MARResult = mar.Apply()
 
     assert MARResult.shape == (NX * NY,)
     assert np.isfinite(MARResult).all()
+
+    # Like MATLAB's fwrite(..., 'double'): raw doubles, no file extension.
+    written = np.fromfile(output / "iMARResult", dtype=np.float64)
+    assert np.array_equal(written, MARResult)
+    assert (output / "PriorSinogram").is_file()
 
     # MATLAB shifts the input by +1000 and never shifts the result back, so water lands
     # at 1000 instead of 0 HU. Measured deviation on this phantom: 0.6 HU.

@@ -14,31 +14,43 @@ from CTBasics.Projects.StaticCT.ProjectsAH.DualSource import (  # noqa: E402
     DualSource_CardiacMotion4DCT_NsourcesSweep_Experiment,
     DualSource_CardiacMotion4DCT_SegmentedSingleSource,
 )
-from CTBasics.Projects.StaticCT.ProjectsAH.DualSource.Shared.\
-    DualSource_appendReconstructionMetrics import (  # noqa: E402
-    DualSource_appendReconstructionMetrics)
-from CTBasics.Projects.StaticCT.ProjectsAH.DualSource.Shared.\
-    DualSource_buildOutputNaming import DualSource_buildOutputNaming  # noqa: E402
-from CTBasics.Projects.StaticCT.ProjectsAH.DualSource.Shared.\
-    DualSource_showAndSaveImage import DualSource_showAndSaveImage  # noqa: E402
-from CTBasics.Projects.StaticCT.ProjectsAH.DualSource.Shared.\
-    DualSource_writeSimulationParameters import (  # noqa: E402
-    DualSource_writeSimulationParameters)
+from CTBasics.Projects.StaticCT.StaticCTHelperFunctions import StaticCTIOHelpers  # noqa: E402
 from CTBasics.Projects.StaticCT.ProjectsAH.Noise import (  # noqa: E402
     MyNoiseTestingCTRecon103,
     TestNoiseCardiac4DCT,
+    WaterNoiseCalibration,
 )
 from CTBasics.Reconstruction.Constants import Constants  # noqa: E402
+
+DualSource_appendReconstructionMetrics = StaticCTIOHelpers.DualSource_appendReconstructionMetrics
+DualSource_buildOutputNaming = StaticCTIOHelpers.DualSource_buildOutputNaming
+DualSource_showAndSaveImage = StaticCTIOHelpers.DualSource_showAndSaveImage
+DualSource_writeSimulationParameters = StaticCTIOHelpers.DualSource_writeSimulationParameters
 
 COARSE = dict(M=97, Npar=48, Nx=64, Ny=64)
 
 
+MAIN_COARSE = dict(Npar=48, DetectorElements=97, ImageSize=64, ShowTimingPlot=False)
+
+
 @pytest.fixture(scope="module")
-def dualsourcemain(tmp_path_factory):
-    directory = tmp_path_factory.mktemp("dualsource_main")
+def ctbasicsconfig(tmp_path_factory):
+    """Temporary CTBasicsConfig.txt whose output folder lives in a temp directory."""
+    directory = tmp_path_factory.mktemp("ctbasics_config")
+    output = directory / "out"
+    output.mkdir()
+    (directory / "Data").mkdir()
+    (directory / "CTBasicsConfig.txt").write_text(
+        f"#\n{directory}\n#\n{output}\n#\n\n")
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setenv("CTBASICS_CONFIG", str(directory))
+        yield output
+
+
+@pytest.fixture(scope="module")
+def dualsourcemain(ctbasicsconfig):
     return DualSource_CardiacMotion4DCT_Main.main(
-        Outputdirectory=str(directory), Nsources=2, SelectedPhantom="LinePattern",
-        **COARSE)
+        Nsources=2, SelectedPhantom="LinePattern", SimulateNoise=False, **MAIN_COARSE)
 
 
 def test_build_output_naming_line_pattern():
@@ -99,20 +111,78 @@ def test_show_and_save_image_writes_hu_values(tmp_path):
     assert "Ph_LinePattern_P1C0S0" in Path(filename).name
 
 
-def test_dualsource_main_splits_views_across_sources(dualsourcemain):
-    geometry = dualsourcemain["Geometry"]
+def test_dualsource_main_returns_matlab_results_fields(dualsourcemain, ctbasicsconfig):
+    assert set(dualsourcemain) == {"Parameters", "Metrics", "OutputDirectory", "Images"}
+    assert dualsourcemain["Parameters"] == {
+        "HeartRateBPM": 60, "TRotSeconds": 0.5, "Nsources": 2, "Npar": 48,
+        "DetectorElements": 97, "ImageSize": 64, "PhotonCount": 2.25e5,
+        "RandomSeed": 1, "SelectedPhantom": "LinePattern"}
+    assert set(dualsourcemain["Metrics"]) == {
+        f"{metric}_{variant}{roi}" for metric in ("NCC", "RMSE", "SSIM")
+        for variant in ("Normal", "DualSource") for roi in ("", "_ROI")}
 
-    assert list(geometry["NprojPerSource"]) == [24, 24]
-    assert sum(geometry["NprojPerSource"]) == geometry["Npi"]
-    assert dualsourcemain["Projections"].size == geometry["Npi"] * geometry["M"]
+    images = dualsourcemain["Images"]
+    assert {key: value.shape for key, value in images.items()} == dict.fromkeys(
+        ("Normal", "DualSource", "GroundTruth", "GroundTruthRest", "ROIMask"), (64, 64))
+    assert images["ROIMask"].dtype == bool and images["ROIMask"].any()
+
+    output = Path(dualsourcemain["OutputDirectory"])
+    assert output.parent == ctbasicsconfig / "cardiacPhantom" / "data" / "linePattern"
+    assert output.name == "aRot_0_HR_60_TRot_500ms_N_48_PS_0_NSources_2_Ph_P1C0S0"
+    assert (output / "simulation_parameters.txt").is_file()
+    assert (output / "reconstruction_metrics.txt").is_file()
+    assert (output / "Recon-multi_HR60_TRot500ms_N48_PS0_Ph_LinePattern_P1C0S0").is_file()
 
 
 def test_dualsource_main_reaches_high_correlation(dualsourcemain):
-    metrics = dualsourcemain["Metrics"][0]
+    metrics = dualsourcemain["Metrics"]
 
-    assert metrics["corr2_single"] > 0.99
-    assert metrics["corr2_multi"] > 0.99
-    assert metrics["rmse_multi"] < 0.01
+    assert metrics["NCC_Normal"] > 0.99
+    assert metrics["NCC_DualSource"] > 0.99
+    assert 0 < metrics["SSIM_DualSource"] <= 1
+    # Metrics are in HU now: the noise-free coarse run stays within a few HU.
+    assert metrics["RMSE_DualSource"] < 20
+
+
+def test_dualsource_main_is_reproducible_and_writes_nothing_without_writedata(
+        ctbasicsconfig):
+    arguments = dict(Nsources=3, SelectedPhantom="Cardiac", PhotonCount=1e5,
+                     ShowPictures=False, WriteData=False, IncludeImageData=False,
+                     Npar=24, DetectorElements=49, ImageSize=32, ShowTimingPlot=False)
+
+    first = DualSource_CardiacMotion4DCT_Main.main(72, 0.3, **arguments)
+    second = DualSource_CardiacMotion4DCT_Main.main(72, 0.3, **arguments)
+
+    assert "Images" not in first
+    # rng(RandomSeed) reseeds the shared Poisson generator, so noisy runs repeat.
+    assert first["Metrics"] == second["Metrics"]
+    assert first["Parameters"]["HeartRateBPM"] == 72
+    assert not Path(first["OutputDirectory"]).exists()
+    assert Path(first["OutputDirectory"]).name == \
+        "aRot_0_HR_72_TRot_300ms_N_24_PS_0_NSources_3_Ph_P1C0S0"
+
+
+def test_dualsource_main_rejects_invalid_options(ctbasicsconfig):
+    with pytest.raises(ValueError):
+        DualSource_CardiacMotion4DCT_Main.main(Nsources=0)
+    with pytest.raises(ValueError):
+        DualSource_CardiacMotion4DCT_Main.main(-60)
+
+
+def test_water_noise_calibration_follows_inverse_sqrt_law():
+    result = WaterNoiseCalibration.main(
+        N_I0_sweep=(1e4, 4e4, 1.6e5), M=65, Npar=32, Nx=32, Ny=32)
+
+    sigma = result["measuredSigmaHU"]
+    assert result["waterRoiRadiusPx"] == 7
+    assert result["waterMask"].sum() > 100
+    # Quadrupling the photons roughly halves the water noise.
+    assert sigma[0] > sigma[1] > sigma[2]
+    assert sigma[0] / sigma[1] == pytest.approx(2.0, rel=0.35)
+    assert np.allclose(result["cEstimatePerRun"], sigma * np.sqrt(result["N_I0_sweep"]))
+    assert result["recommendedN_I0"] == pytest.approx(
+        (result["cEstimate"] / 35) ** 2)
+    assert np.all(np.abs(result["measuredMeanHU"]) < 100)
 
 
 def test_ctrecon101_dualsource_reproduces_matlab_argument_bug(tmp_path):

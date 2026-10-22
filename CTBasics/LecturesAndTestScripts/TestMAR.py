@@ -1,19 +1,19 @@
 """Metal artifact reduction on a hip slice.
 
-Port of LecturesAndTestScripts/TestMAR.m. MATLAB loads a DICOM slice from the data
-folder; because that data is not part of the repository the simulated phantom branch
-(MATLAB's `if(false)` branch) is the default here.
+Port of LecturesAndTestScripts/TestMAR.m. MATLAB always loads the DICOM slice
+`Data/MAR2D/hip2.ima` (the phantom branch sits behind `if(false)`); `UsePatientData=False`
+selects that dead phantom branch.
 """
 import numpy as np
 
-from ..Apps.MAR import MAR
-from ..ImageManipulation.ImageManipulation import ImageManipulation
-from ..ReadAndWrite.IOHelperFunctions import IOHelperFunctions
-from ..Reconstruction.Constants import Constants
-from ..Simulation.CreatePhantom import CreatePhantom
+from CTBasics.Apps.MAR import MAR
+from CTBasics.ImageManipulation.ImageManipulation import ImageManipulation
+from CTBasics.ReadAndWrite.IOHelperFunctions import IOHelperFunctions
+from CTBasics.Reconstruction.Constants import Constants
+from CTBasics.Simulation.CreatePhantom import CreatePhantom
 
 
-def main(UsePatientData=False, DataDirectory=None, Nx=256, Ny=256, Npar=512, M=500,
+def main(UsePatientData=True, DataDirectory=None, Nx=256, Ny=256, Npar=512, M=500,
          SelectedPhantom="HipWithMetal"):
     RM = 250.0          # Radius of the field of measurement (FOM).
     thetaN = np.pi
@@ -48,7 +48,8 @@ def main(UsePatientData=False, DataDirectory=None, Nx=256, Ny=256, Npar=512, M=5
         V_HU, V_info, V_mapped = IOHelperFunctions.read_Dicom_Slice(str(filename))
         V_HU = np.asarray(V_HU, dtype=float)
         V_HU = ImageManipulation.Resample2D(V_HU, Nx, Ny)
-        Voxelphantom = V_HU.T.ravel()
+        # MATLAB `X = V'; X(:)'` is the row-major flattening of V.
+        Voxelphantom = V_HU.ravel()
 
     aMAR = MAR(Voxelphantom, x0, dx, Nx, y0, dy, Ny, theta0, dtheta, Npar, xi0, dxi, M)
     Result = aMAR.Apply()

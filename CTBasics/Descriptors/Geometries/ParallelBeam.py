@@ -2,8 +2,8 @@ import math
 
 import numpy as np
 
-from ..ScannerGeometryTypes import ScannerGeometryTypes
-from .BaseScannerGeometry import BaseScannerGeometry
+from CTBasics.Descriptors.ScannerGeometryTypes import ScannerGeometryTypes
+from CTBasics.Descriptors.Geometries.BaseScannerGeometry import BaseScannerGeometry
 
 _COPIED_PROPERTIES = (
     "RM", "M", "dxi", "xi0", "N2pi", "thetaN_min", "dtheta", "thetaN", "Npar", "theta0",

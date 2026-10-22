@@ -23,10 +23,11 @@ def _WriteConfig(directory, TfsPath):
 
 
 def test_run_all_scripts_matches_matlab_order():
-    # RunAllScripts.m runs these twelve scripts in exactly this order.
-    assert len(RunAllScripts.SCRIPTS) == 12
+    # RunAllScripts.m runs these thirteen scripts in exactly this order.
+    assert len(RunAllScripts.SCRIPTS) == 13
     assert RunAllScripts.SCRIPTS[0].endswith("TestScript2D")
     assert RunAllScripts.SCRIPTS[6].endswith("TestMAR")
+    assert RunAllScripts.SCRIPTS[10].endswith("StaticCT_JP_HeartRateVsNSubsets_Sweep")
     assert RunAllScripts.SCRIPTS[-1].endswith("StaticCT_4_RealTimeImaging_Script_CH")
     # The commented out raw data script must not sneak back in.
     assert not any("TestScriptScannerData3D" in name for name in RunAllScripts.SCRIPTS)

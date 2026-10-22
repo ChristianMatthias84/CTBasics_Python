@@ -1,5 +1,5 @@
 """Standalone driver scripts."""
 
-from .ColliScript import ColliScript
+from CTBasics.Scripts.ColliScript import ColliScript
 
 __all__ = ["ColliScript"]

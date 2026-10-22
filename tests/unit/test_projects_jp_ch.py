@@ -17,14 +17,17 @@ from CTBasics.Projects.StaticCT.ProjectsJP import (  # noqa: E402
     TestCardiacPhantom,
     test_4DCT_prosp,
 )
-from CTBasics.Projects.StaticCT.ProjectsJP.StaticCT_appendReconstructionMetrics import (  # noqa: E402
-    StaticCT_appendReconstructionMetrics)
-from CTBasics.Projects.StaticCT.ProjectsJP.StaticCT_computeReconstructionMetrics import (  # noqa: E402
-    StaticCT_computeReconstructionMetrics)
-from CTBasics.Projects.StaticCT.ProjectsJP.StaticCT_createSubsetAnimationGif import (  # noqa: E402
-    StaticCT_createSubsetAnimationGif)
-from CTBasics.Projects.StaticCT.ProjectsJP.StaticCT_plotReconstructionResults import (  # noqa: E402
-    StaticCT_plotReconstructionResults)
+from CTBasics.Projects.StaticCT.StaticCTHelperFunctions import (  # noqa: E402
+    StaticCTIOHelpers,
+    StaticCTVisualizationAndEvaluationHelpers,
+)
+
+StaticCT_appendReconstructionMetrics = StaticCTIOHelpers.StaticCT_appendReconstructionMetrics
+StaticCT_computeReconstructionMetrics = (
+    StaticCTVisualizationAndEvaluationHelpers.StaticCT_computeReconstructionMetrics)
+StaticCT_createSubsetAnimationGif = StaticCTIOHelpers.StaticCT_createSubsetAnimationGif
+StaticCT_plotReconstructionResults = (
+    StaticCTVisualizationAndEvaluationHelpers.StaticCT_plotReconstructionResults)
 
 COARSE = dict(M=97, N2pi=64, Nx=64, Ny=64)
 
@@ -34,6 +37,7 @@ def prosp(tmp_path_factory):
     directory = tmp_path_factory.mktemp("prosp")
     return test_4DCT_prosp.main(
         Outputdirectory_base=str(directory), NSubsets=8, NRecons=3, isplot=False,
+        SelectedPhantom="Respiratory", MotionType="full", TRest=0,
         UseLinearCache=False, **COARSE)
 
 
@@ -47,7 +51,8 @@ def test_compute_metrics_is_perfect_for_identical_images():
     RoI_all = [np.array([[0.0], [0.0]]), np.array([[2.0], [-2.0]])]
 
     (RMSE_linear, RMSE_arbitrary, NCC_linear, NCC_arbitrary,
-     ssim_linear, ssim_arbitrary, nRoI, roi_mask, center_mask) = \
+     ssim_linear, ssim_arbitrary, nRoI, roi_mask, center_mask,
+     RMSE_linear_bg, _, NCC_linear_bg, _, ssim_linear_bg, _, background_mask) = \
         StaticCT_computeReconstructionMetrics(Image, Image, Image, RoI_all,
                                               Nx, Ny, x0, y0, dx, dy, 6.0)
 
@@ -57,6 +62,10 @@ def test_compute_metrics_is_perfect_for_identical_images():
     assert np.allclose(NCC_linear, 1.0)
     assert np.allclose(ssim_linear, 1.0)
     assert np.allclose(ssim_arbitrary, 1.0)
+    assert np.allclose(RMSE_linear_bg, 0.0)
+    assert np.allclose(NCC_linear_bg, 1.0)
+    assert np.allclose(ssim_linear_bg, 1.0)
+    assert not np.any(background_mask[0] & roi_mask[(0, 0)])
 
     # The ROI center in pixels follows (center - origin)/spacing + 1.
     assert np.allclose(center_mask[(0, 0)], [17.0, 17.0])
@@ -80,6 +89,53 @@ def test_compute_metrics_degrades_with_noise():
     assert ssim_linear[0, 0] < ssim_arbitrary[0, 0]
     assert ssim_arbitrary[0, 0] == pytest.approx(1.0)
 
+
+def test_ssim_of_constant_images_reduces_to_the_luminance_term():
+    from CTBasics.Projects.StaticCT.StaticCTHelperFunctions.\
+        StaticCTVisualizationAndEvaluationHelpers import _SSIM
+
+    A = np.arange(16.0).reshape(4, 4) % 4
+
+    assert _SSIM(A, A, 3.0) == pytest.approx(1.0)
+    assert _SSIM(A, A.T.copy(), 3.0) < 1.0
+
+    # Replicate padding keeps constant images constant, so only the luminance term remains.
+    C1 = (0.01 * 3.0) ** 2
+    Constant = np.full((4, 4), 2.0)
+    assert _SSIM(Constant, Constant + 1.0, 3.0) == pytest.approx((12 + C1) / (13 + C1))
+
+
+def test_phantom_roi_mask_places_four_arteries():
+    roiMask, centers, radii = StaticCTVisualizationAndEvaluationHelpers.DualSource_buildPhantomRoiMask(
+        "Cardiac4Arteries", [3, -2], 128, 128, -64, -64, 1, 1, [60, 60])
+
+    assert roiMask.shape == (128, 128)
+    assert centers.shape == (2, 4)
+    assert np.allclose(radii, 8.0)
+    # MATLAB rounds the centers to whole pixels: round(25*cos(pi/4) + 3 + 64) = 85.
+    assert centers[:, 0].tolist() == [85.0, 80.0]
+    assert roiMask[79, 84]
+
+
+def test_phantom_roi_mask_falls_back_to_a_legacy_circle():
+    roiMask, centers, radii = StaticCTVisualizationAndEvaluationHelpers.DualSource_buildPhantomRoiMask(
+        "Unknown", [0, 0], 32, 32, -16, -16, 1, 1, [10, 40])
+
+    assert centers.ravel().tolist() == [10, 32]
+    assert radii.tolist() == [80.0]
+    assert roiMask.all()
+
+
+def test_export_figure_writes_the_file(tmp_path):
+    import matplotlib.pyplot as plt
+
+    figure = plt.figure()
+    target = tmp_path / "figure.png"
+
+    StaticCTVisualizationAndEvaluationHelpers.StaticCT_exportFigure(figure, str(target), 50)
+    plt.close(figure)
+
+    assert target.stat().st_size > 0
 
 def test_append_metrics_pads_and_averages(tmp_path):
     RMSE_linear = np.array([[10.0, 20.0], [30.0, np.nan]])
@@ -200,7 +256,7 @@ def test_prosp_rejects_unknown_recon_type(tmp_path):
 
 def test_prosp_linear_cache_round_trip(tmp_path):
     arguments = dict(Outputdirectory_base=str(tmp_path), NSubsets=4, NRecons=2,
-                     isplot=False, writeData=False, **COARSE)
+                     isplot=False, writeData=False, ForceLinearRecon=False, **COARSE)
 
     first = test_4DCT_prosp.main(**arguments)
     assert first["linearRecon"] is True
@@ -210,6 +266,95 @@ def test_prosp_linear_cache_round_trip(tmp_path):
     assert second["linearRecon"] is False
     assert np.allclose(first["MultiphaseRecon_linear"],
                        second["MultiphaseRecon_linear"])
+    assert np.allclose(first["MultiphaseRecon_linear_avg"],
+                       second["MultiphaseRecon_linear_avg"])
+
+    # The cache file name ignores TRest and N_I0, but PhantomFlags/SimParams do not.
+    changedPhantom = test_4DCT_prosp.main(**{**arguments, "TRest": 0.25})
+    assert changedPhantom["linearRecon"] is True
+    changedSim = test_4DCT_prosp.main(**{**arguments, "TRest": 0.25, "N_I0": 1e6})
+    assert changedSim["linearRecon"] is True
+
+
+def test_prosp_force_linear_recon_ignores_cache(tmp_path):
+    arguments = dict(Outputdirectory_base=str(tmp_path), NSubsets=4, NRecons=2,
+                     isplot=False, writeData=False, **COARSE)
+
+    test_4DCT_prosp.main(**arguments)
+    # MATLAB currently sets linearRecon = true unconditionally.
+    assert test_4DCT_prosp.main(**arguments)["linearRecon"] is True
+
+
+def test_prosp_cache_without_parameters_is_rejected():
+    TRecon = np.array([0.0, 0.5])
+    PhantomFlags = ["Cardiac", 60, True, 0, "half", 0.5, False, False, 1, math.pi / 4]
+    Saved = {"TRecon_save": TRecon.reshape(1, -1),
+             "PhantomFlags": test_4DCT_prosp._ToCell(PhantomFlags),
+             "SimParams": test_4DCT_prosp._ToCell([0.5, "180", False])}
+
+    assert test_4DCT_prosp._CacheMatches(Saved, TRecon, PhantomFlags,
+                                         [0.5, "180", False])
+    assert not test_4DCT_prosp._CacheMatches(Saved, TRecon, PhantomFlags,
+                                             [0.5, "360", False])
+    assert not test_4DCT_prosp._CacheMatches(Saved, TRecon, PhantomFlags,
+                                             [0.5, "180", True])
+    # Caches written before PhantomFlags/SimParams existed are never reused.
+    assert not test_4DCT_prosp._CacheMatches({"TRecon_save": TRecon}, TRecon,
+                                             PhantomFlags, [0.5, "180", False])
+
+
+def test_prosp_angle_arrays(prosp):
+    expected = np.linspace(0, 2 * math.pi, 64 + 1)[:-1]
+
+    assert np.allclose(prosp["ThetaArray"], expected)
+    # MATLAB hardcodes 2 subsets, so NSubsets=8 does not change the arbitrary order.
+    arbitrary = np.asarray(prosp["ThetaArray_arbitrary"]).ravel()
+    from CTBasics.Projects.StaticCT.StaticCTHelperFunctions import (
+        StaticCTSystemHelperFunctions)
+    assert np.allclose(arbitrary,
+                       StaticCTSystemHelperFunctions.SubsetInterleaving(64, 2, "180", 0))
+    assert np.unique(arbitrary).size == 64
+    assert not np.allclose(arbitrary, expected)
+
+
+def test_prosp_average_of_single_scans_matches_long_sinogram(tmp_path):
+    result = test_4DCT_prosp.main(
+        Outputdirectory_base=str(tmp_path), NSubsets=4, NRecons=2, NScansPerRecon=2,
+        isplot=False, writeData=False, UseLinearCache=False, **COARSE)
+
+    assert result["ReconstructedImage_arbitrary_single"].shape == (2, 2, 64 * 64)
+    assert result["phaseIdx"] == 2
+    # The second half turn is reconstructed from theta0 = pi, so the per-scan average
+    # equals the long-sinogram reconstruction up to rounding.
+    assert result["relDiff_linear"] < 1e-10
+    assert result["relDiff_arbitrary"] < 1e-10
+    assert np.allclose(result["MultiphaseReconHU_arbitrary_avg"],
+                       result["MultiphaseReconHU_arbitrary"], atol=1e-8)
+    assert result["N_I0_per_scan"] is None
+
+
+def test_prosp_noise_budget_is_split_over_scans(tmp_path, monkeypatch):
+    from CTBasics.Simulation.Noise import Noise
+
+    calls = []
+
+    def RecordNoise(Projections, N, I0):
+        calls.append((np.asarray(Projections).size, N, I0))
+        return np.asarray(Projections, dtype=float).ravel()
+
+    monkeypatch.setattr(Noise, "ApplyPoissonNoise", staticmethod(RecordNoise))
+
+    result = test_4DCT_prosp.main(
+        Outputdirectory_base=str(tmp_path), NSubsets=4, NRecons=2, NScansPerRecon=4,
+        SimNoise=True, N_I0=1000, isplot=False, writeData=False, UseLinearCache=False,
+        **COARSE)
+
+    assert result["N_I0_per_scan"] == pytest.approx(250)
+    # Linear and arbitrary projections only (no noise on the ground truth).
+    assert len(calls) == 2 * 2 * 4
+    rowSize = 97 * 32
+    assert all(size == rowSize and N == rowSize and I0 == pytest.approx(250)
+               for size, N, I0 in calls)
 
 
 def test_real_time_imaging_adds_poisson_noise(tmp_path):
@@ -223,6 +368,22 @@ def test_real_time_imaging_adds_poisson_noise(tmp_path):
     assert result["nRoI"] == 4
     # Noise raises the error level far above the noise free JP configuration.
     assert np.nanmean(result["RMSE_linear"]) > 20
+    # The CH script keeps the original JP angle arrays.
+    assert result["ThetaArray"][-1] == pytest.approx(2 * math.pi - geometry["dtheta"])
+
+
+def test_contrastmedia_angle_order_and_n2pi_tag(tmp_path):
+    result = StaticCT_4_ContrastmediaOrEmbo.main(
+        OutputBaseDir=str(tmp_path), NSubsets=8, NRecons=1, M=97, N2pi=64,
+        Nx=32, Ny=32, ShowFinalRecons=False, WriteData=False)
+    geometry = result["Geometry"]
+
+    assert "_N2pi64_NSub8_" in Path(result["OutputDir"]).name
+    assert geometry["theta0"] == pytest.approx(-geometry["dtheta"])
+    # Index-domain interleaving reorders the linear angles without repeating any.
+    assert np.allclose(np.sort(result["ThetaArrayArbitrary"]),
+                       np.sort(result["ThetaArrayLinear"]))
+    assert not np.allclose(result["ThetaArrayArbitrary"], result["ThetaArrayLinear"])
 
 
 def test_contrastmedia_signal_follows_motion_profile(tmp_path):
