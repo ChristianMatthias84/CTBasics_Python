@@ -7,6 +7,9 @@
   central `../../.github/copilot-instructions.md`.
 - Read `LibraryConcept.md` for the architecture: packages, data model, pipeline, conventions,
   and where new code goes. Keep it current when the architecture or a convention changes.
+- Check `KNOWN_ISSUES.md` before relying on or changing affected code. Add issues you find
+  but do not fix; remove entries you fix.
+- Add one line to `CHANGELOG.md` (current date, newest first) for every notable change.
 - Preserve existing user changes and keep edits focused on the requested task.
 
 ## Project and layout

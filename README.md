@@ -4,7 +4,8 @@ Python framework for CT physics: phantom simulation, forward projection, fan-to-
 rebinning, filtering, and weighted filtered backprojection for 2D, 3D sequence, and 3D spiral
 scans, plus stationary multi-source (Static CT) experiments and metal artifact reduction.
 
-Architecture and conventions: [LibraryConcept.md](LibraryConcept.md).
+Architecture and conventions: [LibraryConcept.md](LibraryConcept.md). Bugs and limitations:
+[KNOWN_ISSUES.md](KNOWN_ISSUES.md). History: [CHANGELOG.md](CHANGELOG.md).
 
 ## Installation
 
