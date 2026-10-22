@@ -36,9 +36,8 @@ its concepts may depart from the original.
 
 - Names of folders, files, classes, and methods still come from MATLAB, including original
   typos such as `Convovle3DSpiralSinogram`. They may be renamed as the design evolves.
-- Migration artefacts live in [../../Migration](../../Migration) and are temporary. Move
-  anything still relevant from `Migration/docs/` into this document before `Migration/` is
-  removed.
+- Bugs of the MATLAB original were ported verbatim to keep parity; they are listed in
+  section 10 and can now be fixed.
 
 ## 3. Layered architecture
 
@@ -179,8 +178,9 @@ their result in the output folder under a file name derived from the descriptor.
   the numba thread count; workers use one thread.
 - **Linear algebra.** Convolution uses a Toeplitz matrix product (BLAS) instead of loops.
 - **Why this design.** The numpy kernels are limited by memory bandwidth, so process pools
-  scale poorly. Thread-parallel numba kernels are 6–20× faster than MATLAB; the measured
-  runtimes are in `Migration/docs/progress.md`. The first run compiles the kernels; the cache
+  scale poorly. Thread-parallel numba kernels are 6–20× faster than MATLAB (i7-11850H,
+  16 threads: e.g. `StaticCT3D` 70 s vs. 413 s, `TestScript3D` 30 s vs. 217 s, `CTRecon103`
+  4.8 s vs. 59 s). The first run compiles the kernels; the cache
   is written to `__pycache__`, and editing a kernel module invalidates it.
 
 ## 7. Configuration and data
@@ -202,8 +202,7 @@ their result in the output folder under a file name derived from the descriptor.
   pipelines). `conftest.py` runs everything serially. Tests use tiny sizes and a temporary
   config.
 - **Numerical changes** are checked against the previous Python results (regression on small
-  sizes) and against physical or analytical expectations, not against MATLAB. The MATLAB
-  parity tools in `Migration/tools/parity/` are legacy.
+  sizes) and against physical or analytical expectations. MATLAB is no longer a reference.
 
 ## 9. Open points and roadmap
 
@@ -213,7 +212,47 @@ their result in the output folder under a file name derived from the descriptor.
 - The spectral 3D forward projection is empty in MATLAB as well, so `TestScript3D` raises
   `NotImplementedError` for it.
 
-## 10. Where new code goes
+## 10. Known issues inherited from MATLAB
+
+Ported verbatim to keep parity. Each is a candidate for a fix; remove the entry when it is
+fixed.
+
+Reconstruction and simulation:
+
+- `ForwardProjection.StaticCTCollimation*SourceSampled` sum the source samples without
+  dividing by their count.
+- `ForwardProjection.CalculateIntersectionPointsCircleAndLineIn2D_StaticCTGeo` returns `NaN`
+  when the line misses the collimator circle; callers reject such rays.
+- `Backprojection._WFBP3DVoxels` computes `l = sqrt((RF^2 - xi^2) - x*ss + y*cc)`; a negative
+  radicand yields `NaN`.
+- `Backprojection.SpiralWFBP3DFullyPixelDrivenParallelized_StaticCT` weights the cone angle
+  with `RFD` (exact only for the centre beam) and sizes the last z window with `zStacksize`
+  instead of `zStacksizeLast`.
+- `Backprojection.SequenceWFBP3DFullyPixelDrivenParallelized_StaticCT` reconstructs the last
+  z stack with the fan-beam `SequenceWFBP3DFullyPixelDriven`.
+- `Spiral.SetScanRange` uses `max(Geometry.beta)` and therefore fails for `StaticCTBeam`.
+- `ForwardProjection.RayDrivenForwProjParCartesianMultipleWithMotionDual_linear` allocates but
+  never fills `PhantomTruth`; `..._Dual_ParallelSimple` sizes it `(N, M)`.
+- `CreatePhantom`: `WaterWith4Arteries` negates the quarter condition for artery 4;
+  `CreateVoxelPhantom2D('SimpleEllipseWithHips3D')` cannot work (raises `ValueError`).
+- `ImageManipulation.Resample2D` uses the query grid `1:sz/N:sz`, which is not centred.
+
+Applications and projects:
+
+- `MAR.Apply` never removes the +1000 input shift; NMAR normalization adds 1000 to the line
+  integrals. `MAR.MetalTraceInterpolation` raises `IndexError` at the detector border.
+- `StaticCTSystemHelperFunctions.GreedyGapSamplingSubset(0, ...)` returns one angle.
+- `CTRecon101DualSource` calls the projector with one argument missing (`TypeError`);
+  `UseArbitraryOrder=True` is the working path.
+- `StaticCT_4_ContrastmediaOrEmbo` recreates the loop-invariant ground truth inside the
+  backprojection loop and leaves `ProjectionsGT` empty.
+- `test_4DCT_prosp` always uses 2 subsets for the arbitrary angle order (`NSubsets` only
+  labels the output).
+- `NsourcesSweep` passes no `SelectedPhantom` (projector default `"Cardiac"`) and discards
+  the Moire-filtered multi-source sinogram when `SimNoise` is on.
+- `TestNoiseCardiac4DCT` hard-codes `Heartrate = 80` in the projector calls.
+
+## 11. Where new code goes
 
 | New functionality | Location |
 |---|---|
